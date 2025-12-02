@@ -1,4 +1,5 @@
 import { EntityType, LevelConfig, YuriEvent } from './types';
+import specialCg from './components/special_cg.png';
 
 export const GRAVITY = 0.6;
 export const JUMP_FORCE = -14.5; 
@@ -10,7 +11,7 @@ export const BGM_URL = "https://codeskulptor-demos.commondatastorage.googleapis.
 
 // 【重要】GitHub Pages 部署适配：使用相对路径 "./special_cg.png"
 // 这样无论项目部署在根域名还是子目录下（如 username.github.io/repo/），都能正确找到文件
-export const SPECIAL_CG_URL = "components/special_cg.png"; 
+export const SPECIAL_CG_URL = specialCg;
 
 // --- Level Design ---
 
