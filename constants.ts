@@ -1,5 +1,6 @@
 import { EntityType, LevelConfig, YuriEvent } from './types';
 import specialCg from './components/special_cg.png';
+import bgm from './components/haruhikage_8bit.mp3';
 
 export const GRAVITY = 0.6;
 export const JUMP_FORCE = -14.5; 
@@ -7,7 +8,7 @@ export const MOVE_SPEED = 5;
 export const LAYER_COOLDOWN = 400; 
 
 // 使用稳定的 Google CDN 8-bit 音乐链接
-export const BGM_URL = "https://codeskulptor-demos.commondatastorage.googleapis.com/GalaxyInvaders/theme_01.mp3"; 
+export const BGM_URL = bgm;
 
 // 【重要】GitHub Pages 部署适配：使用相对路径 "./special_cg.png"
 // 这样无论项目部署在根域名还是子目录下（如 username.github.io/repo/），都能正确找到文件
