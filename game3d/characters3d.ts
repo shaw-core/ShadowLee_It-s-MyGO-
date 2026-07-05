@@ -8,7 +8,7 @@
 // ============================================================
 import * as THREE from 'three';
 
-export type SkinId = 'skin1' | 'skin2' | 'skin3' | 'skin4';
+export type SkinId = 'skin1' | 'skin2' | 'skin3' | 'skin4' | 'skinNovus';
 
 export interface SkinMeta {
   id: SkinId;
@@ -22,6 +22,7 @@ export const SKINS: SkinMeta[] = [
   { id: 'skin2', name: '2号 · 显示器头', vibe: 'AI · 机器人 · 电子吉祥物', features: ['身体与1号相同', '头部是一块显示器', '屏幕上是睡眼猫嘴表情', '顶部机械耳'] },
   { id: 'skin3', name: '3号 · 熊猫外套', vibe: '活泼 · 外向 · 冒险感', features: ['及腰长白发', '宽大蓝色外套', '熊猫耳 + 护目镜', '白色连衣裙'] },
   { id: 'skin4', name: '4号 · 独眼露目', vibe: '安静 · 病弱 · 神秘', features: ['银白短发双侧扎', '单眼眼罩 + 熊猫耳', '白蓝色居家服', '腿上贴着创可贴'] },
+  { id: 'skinNovus', name: '？号 · 室友姐', vibe: '可靠 · 从容 · 温柔', features: ['橘色齐颈发 + 猫耳', '奶油色家居服', '口袋里永远有薄荷糖', '（隐藏角色）'] },
 ];
 
 export interface CharacterRig {
@@ -46,6 +47,10 @@ const COL = {
   black: 0x14161c,
   patch: 0xf6f7f9,
   bandaid: 0xf5d7b8,
+  novusHair: 0xd97742,
+  novusHairShade: 0xb85c2e,
+  cream: 0xfdf3e2,
+  amber: 0x9a5b2e,
 };
 
 const mat = (c: number, opts: Partial<THREE.MeshStandardMaterialParameters> = {}) =>
@@ -96,11 +101,11 @@ const makeMonitorFaceTexture = (): THREE.CanvasTexture => {
 // ---- 部件工厂 ----
 
 // 眼睛（可单独遮某一只）
-const addFace = (head: THREE.Group, hz: number, opts: { patchRight?: boolean }) => {
+const addFace = (head: THREE.Group, hz: number, opts: { patchRight?: boolean; irisColor?: number }) => {
   const mkEye = (x: number) => {
     const white = box(0.1, 0.11, 0.02, COL.white);
     white.position.set(x, 0.02, hz);
-    const iris = box(0.055, 0.11, 0.022, COL.eye);
+    const iris = box(0.055, 0.11, 0.022, opts.irisColor ?? COL.eye);
     iris.position.set(x + 0.015, 0.02, hz + 0.002);
     head.add(white, iris);
   };
@@ -171,6 +176,7 @@ const addBandaid = (leg: THREE.Group, y: number, rot: number) => {
 
 // ============ 主构建函数 ============
 export const buildCharacter = (skin: SkinId): CharacterRig => {
+  if (skin === 'skinNovus') return buildNovus();
   const group = new THREE.Group();
   const body = new THREE.Group();
   group.add(body);
@@ -365,6 +371,92 @@ export const buildCharacter = (skin: SkinId): CharacterRig => {
       mkTie(-0.28); mkTie(0.28);
     }
   }
+
+  return { group, body, head, legL, legR, armL, armR };
+};
+
+
+// ============ 室友姐（依据特殊CG：橘发 · 猫耳 · 奶油色家居服） ============
+const buildNovus = (): CharacterRig => {
+  const group = new THREE.Group();
+  const body = new THREE.Group();
+  group.add(body);
+
+  // 腿（比豆沙修长一点）
+  const makeLeg = (x: number) => {
+    const leg = new THREE.Group();
+    leg.position.set(x, 0.5, 0);
+    const thigh = box(0.12, 0.34, 0.14, COL.skin);
+    thigh.position.y = -0.17;
+    const shoe = box(0.15, 0.11, 0.19, 0x8a5a3b);
+    shoe.position.set(0, -0.42, 0.02);
+    leg.add(thigh, shoe);
+    return leg;
+  };
+  const legL = makeLeg(-0.11);
+  const legR = makeLeg(0.11);
+  body.add(legL, legR);
+
+  // 奶油色宽松上衣 + 米白短裙
+  const top = box(0.5, 0.42, 0.32, COL.cream);
+  top.position.y = 0.74;
+  const collar = box(0.34, 0.07, 0.3, COL.white);
+  collar.position.y = 0.97;
+  const skirt = box(0.46, 0.18, 0.32, 0xfff8ec);
+  skirt.position.y = 0.5;
+  body.add(top, collar, skirt);
+
+  // 手臂
+  const makeArm = (x: number) => {
+    const arm = new THREE.Group();
+    arm.position.set(x, 0.92, 0);
+    const sleeve = box(0.13, 0.32, 0.15, COL.cream);
+    sleeve.position.y = -0.15;
+    const hand = box(0.1, 0.09, 0.1, COL.skin);
+    hand.position.y = -0.35;
+    arm.add(sleeve, hand);
+    return arm;
+  };
+  const armL = makeArm(-0.31);
+  const armR = makeArm(0.31);
+  body.add(armL, armR);
+
+  // 头
+  const head = new THREE.Group();
+  head.position.y = 1.16;
+  body.add(head);
+  const face = box(0.44, 0.38, 0.36, COL.skin);
+  head.add(face);
+  addFace(head, 0.185, { irisColor: COL.amber });
+
+  // 橘色齐颈发：厚刘海 + 包脸侧发 + 后发
+  const bangs = box(0.46, 0.15, 0.1, COL.novusHair);
+  bangs.position.set(0, 0.17, 0.15);
+  const hairTop = box(0.5, 0.17, 0.44, COL.novusHair);
+  hairTop.position.y = 0.22;
+  const hairBack = box(0.48, 0.42, 0.14, COL.novusHair);
+  hairBack.position.set(0, -0.05, -0.17);
+  const hairBackTip = box(0.44, 0.1, 0.12, COL.novusHairShade);
+  hairBackTip.position.set(0, -0.28, -0.16);
+  head.add(bangs, hairTop, hairBack, hairBackTip);
+  const mkSide = (x: number) => {
+    const s = box(0.1, 0.42, 0.3, COL.novusHair);
+    s.position.set(x, -0.06, -0.01);
+    head.add(s);
+  };
+  mkSide(-0.25); mkSide(0.25);
+
+  // 猫耳（橘色外耳 + 浅色内耳）
+  const mkCatEar = (x: number) => {
+    const ear = cone(0.1, 0.2, COL.novusHair);
+    ear.position.set(x, 0.4, 0);
+    ear.rotation.z = x > 0 ? -0.2 : 0.2;
+    const inner = cone(0.05, 0.1, 0xffd9c2);
+    inner.position.set(x, 0.38, 0.03);
+    inner.rotation.z = ear.rotation.z;
+    head.add(ear, inner);
+  };
+  mkCatEar(-0.18); mkCatEar(0.18);
 
   return { group, body, head, legL, legR, armL, armR };
 };

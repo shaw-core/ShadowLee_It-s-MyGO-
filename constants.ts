@@ -148,6 +148,38 @@ export const LEVELS: LevelConfig[] = [
       
       { id: 'goal', type: EntityType.GOAL, x: 1400, y: 400, w: 60, h: 100, layerMask: 'BOTH' },
     ]
+  },
+  {
+    id: 7,
+    name: "尾声：门前的天台",
+    playerStart: { x: 50, y: 400 },
+    entities: [
+      { id: 'f1', type: EntityType.PLATFORM, x: 0, y: 500, w: 380, h: 100, layerMask: 'BOTH' },
+      { id: 'txt_a', type: EntityType.TEXT, x: 70, y: 330, w: 0, h: 0, layerMask: 'BOTH', text: "今晚的风，有点温柔。", color: '#93c5fd' },
+
+      { id: 'pit_a', type: EntityType.HAZARD, x: 380, y: 590, w: 140, h: 10, layerMask: 'BOTH' },
+      { id: 'm_b1', type: EntityType.PLATFORM, x: 360, y: 460, w: 150, h: 16, layerMask: 'MANGA' },
+      { id: 'f2', type: EntityType.PLATFORM, x: 520, y: 500, w: 260, h: 100, layerMask: 'BOTH' },
+
+      { id: 'pit_b', type: EntityType.HAZARD, x: 780, y: 590, w: 200, h: 10, layerMask: 'BOTH' },
+      { id: 'step1', type: EntityType.PLATFORM, x: 700, y: 430, w: 70, h: 16, layerMask: 'BOTH' },
+      { id: 'step2', type: EntityType.PLATFORM, x: 800, y: 370, w: 70, h: 16, layerMask: 'REAL' },
+      { id: 'shard_7_1', type: EntityType.COLLECTIBLE_SHARD, x: 825, y: 330, w: 20, h: 20, layerMask: 'REAL' },
+      { id: 'm_step', type: EntityType.PLATFORM, x: 900, y: 320, w: 90, h: 16, layerMask: 'MANGA' },
+
+      { id: 'roof1', type: EntityType.PLATFORM, x: 1000, y: 340, w: 260, h: 20, layerMask: 'BOTH' },
+      { id: 'txt_b', type: EntityType.TEXT, x: 1030, y: 280, w: 0, h: 0, layerMask: 'BOTH', text: "【Kimo熊】就差一步了！！", color: '#ec4899' },
+      { id: 'shard_7_2', type: EntityType.COLLECTIBLE_SHARD, x: 1110, y: 295, w: 20, h: 20, layerMask: 'MANGA' },
+      { id: 'f3', type: EntityType.PLATFORM, x: 980, y: 500, w: 720, h: 100, layerMask: 'BOTH' },
+
+      { id: 'antenna', type: EntityType.PLATFORM, x: 1300, y: 420, w: 20, h: 80, layerMask: 'REAL' },
+      { id: 'shard_7_3', type: EntityType.COLLECTIBLE_SHARD, x: 1345, y: 465, w: 20, h: 20, layerMask: 'REAL' },
+      { id: 'txt_c', type: EntityType.TEXT, x: 1330, y: 260, w: 0, h: 0, layerMask: 'BOTH', text: "门的光，从天台尽头透出来。", color: '#fbbf24' },
+
+      { id: 'npc_novus', type: EntityType.NPC, x: 1520, y: 436, w: 40, h: 64, layerMask: 'BOTH' },
+      { id: 'special_cg', type: EntityType.COLLECTIBLE_PAGE, x: 1465, y: 396, w: 34, h: 44, layerMask: 'BOTH' },
+      { id: 'goal', type: EntityType.GOAL, x: 1600, y: 400, w: 60, h: 100, layerMask: 'BOTH' },
+    ]
   }
 ];
 
@@ -406,6 +438,47 @@ export const EVENTS: Record<string, YuriEvent> = {
         speakerName: '室友姐',
         text: "是吗？那今晚的碗也归有地位的人洗？",
         choices: [{ id: 'fin', text: "……洗就洗！为了室守星沙！", nextNodeId: null }]
+      }
+    }
+  },
+  'event_level7': {
+    id: 'event_level7',
+    requiredPageId: 'special_cg',
+    startNodeId: 'start',
+    nodes: {
+      'start': {
+        id: 'start',
+        speakerName: '室友姐',
+        text: "（天台上，她背对着门口的光站着，手里拿着什么）来了？走之前，有个东西给你。",
+        choices: [{ id: 'c1', text: "（走过去）什么呀，神神秘秘的……", nextNodeId: 'gift' }]
+      },
+      'gift': {
+        id: 'gift',
+        speakerName: '室友姐',
+        text: "（递过来一张打印出来的照片——是你们俩贴着脸的合照，她还特意P了猫耳和熊猫耳）拿着。万一……门那边的世界会把记忆冲淡呢。",
+        choices: [
+          { id: 'c2a', text: "（接过来，眼眶有点热）你居然会P图？！", nextNodeId: 'tease' },
+          { id: 'c2s', text: "【直球】不需要照片。你这个人，我用整颗心记着。", affectionDelta: { charId: 'novus', amount: 50 }, nextNodeId: 'special', requiresClear: true }
+        ],
+        backgroundStyle: 'MANGA'
+      },
+      'tease': {
+        id: 'tease',
+        speakerName: '室友姐',
+        text: "废话，你直播间的表情包一半是我做的。……喜欢吗？",
+        choices: [{ id: 'c3', text: "（用力点头）最喜欢了！", affectionDelta: { charId: 'novus', amount: 15 }, nextNodeId: 'door' }]
+      },
+      'special': {
+        id: 'special',
+        speakerName: '室友姐',
+        text: "（她愣住了，然后低下头笑了，把照片塞进你手心，指尖停留了两秒）……那这张就当备份。心和备份，我都要。",
+        choices: [{ id: 'c3', text: "（握紧照片）嗯！都给你！", nextNodeId: 'door' }]
+      },
+      'door': {
+        id: 'door',
+        speakerName: '李豆沙',
+        text: "（门的光落在两个人身上。她朝我伸出手。）——走吧。不管那边是什么次元。",
+        choices: [{ id: 'e', text: "（牵住。→ 后编待续）", nextNodeId: null }]
       }
     }
   }

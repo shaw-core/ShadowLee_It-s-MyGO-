@@ -33,13 +33,33 @@ export const EVENTS3D: Record<string, YuriEvent> = {
         id: 'sis2',
         speakerName: '室友姐',
         text: '不调侃你，你腿就不抖了吗？看前面，路还在，只是变宽了。跟紧我。',
-        choices: [{ id: 'c3', text: '……哦。', nextNodeId: 'end' }],
+        choices: [{ id: 'c3', text: '……哦。', nextNodeId: 'dizzy' }],
       },
       'sis2_soft': {
         id: 'sis2_soft',
         speakerName: '室友姐',
         text: '（顿了一下，反手把袖子换成了手）……行。这样总不会散了。走吧，去看看这个世界的尽头有什么。',
-        choices: [{ id: 'c3', text: '（耳朵红了）嗯！', nextNodeId: 'end' }],
+        choices: [{ id: 'c3', text: '（耳朵红了）嗯！', nextNodeId: 'dizzy' }],
+      },
+      'dizzy': {
+        id: 'dizzy',
+        speakerName: '李豆沙',
+        text: '（走了两步，突然扶住额头）等、等一下……天旋地转的……姐，我好像，晕3D。',
+        choices: [{ id: 'cd', text: '（蹲下缓一缓）', nextNodeId: 'candy' }],
+      },
+      'candy': {
+        id: 'candy',
+        speakerName: '室友姐',
+        text: '我猜到了。你连坐旋转木马都吐。（从口袋里掏出一把薄荷糖，在你眼前晃了晃）我先走一步，沿路把糖放好。头晕了就捡来吃，每个存档点我也会等你。',
+        choices: [
+          { id: 'cc1', text: '为什么你口袋里会常备薄荷糖啊……', affectionDelta: { charId: 'novus', amount: 10 }, nextNodeId: 'candy2' },
+        ],
+      },
+      'candy2': {
+        id: 'candy2',
+        speakerName: '室友姐',
+        text: '因为我的室友是个到哪儿都会晕的笨蛋。（弹了一下你的额头）别掉队了。',
+        choices: [{ id: 'cc2', text: '（捂着额头）知、知道了！', nextNodeId: 'end' }],
       },
       'end': {
         id: 'end',

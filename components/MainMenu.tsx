@@ -11,10 +11,11 @@ interface MainMenuProps {
   isGameCleared: boolean;      // 前编（2D）通关
   is3DCleared?: boolean;       // 后编（3D）通关
   isFullCompletion?: boolean;
+  hasSpecialCG?: boolean;
   onCheatUnlock?: () => void; // New cheat prop
 }
 
-const MainMenu: React.FC<MainMenuProps> = ({ onStart2D, onStart3D, onGallery, onSkinSelect, onSecretEnding, isGameCleared, is3DCleared, isFullCompletion, onCheatUnlock }) => {
+const MainMenu: React.FC<MainMenuProps> = ({ onStart2D, onStart3D, onGallery, onSkinSelect, onSecretEnding, isGameCleared, is3DCleared, isFullCompletion, hasSpecialCG, onCheatUnlock }) => {
   const [showCG, setShowCG] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [clickCount, setClickCount] = useState(0);
@@ -29,7 +30,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ onStart2D, onStart3D, onGallery, on
   };
 
   return (
-    <div className="w-full h-screen flex flex-col items-center justify-center bg-[#FEF7CD] text-blue-900 relative overflow-hidden font-pixel">
+    <div className="w-full min-h-screen py-10 flex flex-col items-center justify-center bg-[#FEF7CD] text-blue-900 relative overflow-y-auto font-pixel">
       {/* Background decoration */}
       <div className="absolute inset-0 z-0 opacity-20 pointer-events-none">
           <div className="absolute top-0 left-0 w-full h-full manga-pattern opacity-10"></div>
@@ -37,10 +38,10 @@ const MainMenu: React.FC<MainMenuProps> = ({ onStart2D, onStart3D, onGallery, on
           <div className="absolute bottom-1/4 right-1/4 w-32 h-32 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl animate-pulse" style={{animationDelay: '1s'}}></div>
       </div>
 
-      <div className="z-10 text-center space-y-8">
+      <div className="z-10 text-center space-y-5">
         <h1 
             onClick={handleTitleClick}
-            className="text-5xl md:text-7xl font-bold tracking-tighter mb-4 text-blue-600 drop-shadow-[4px_4px_0_#fff] cursor-pointer select-none active:scale-95 transition-transform"
+            className="text-4xl md:text-6xl font-bold tracking-tighter mb-2 text-blue-600 drop-shadow-[4px_4px_0_#fff] cursor-pointer select-none active:scale-95 transition-transform"
             title="Continuous Click 5 times to unlock ALL"
         >
             李豆沙的<br/>次元冲刺
@@ -49,10 +50,10 @@ const MainMenu: React.FC<MainMenuProps> = ({ onStart2D, onStart3D, onGallery, on
           - 秘密百合漫画册 -
         </p>
 
-        <div className="flex flex-col gap-6 w-64 mx-auto pt-12">
+        <div className="flex flex-col gap-3 w-72 mx-auto pt-6">
           <button 
             onClick={onStart2D}
-            className="group flex items-center justify-center px-6 py-4 bg-blue-500 text-white font-bold text-xl border-4 border-blue-700 hover:bg-blue-400 hover:border-blue-500 transition-none retro-border shadow-[4px_4px_0_0_#1e3a8a] hover:translate-y-1 hover:shadow-none"
+            className="group flex items-center justify-center px-6 py-3 bg-blue-500 text-white font-bold text-lg border-4 border-blue-700 hover:bg-blue-400 hover:border-blue-500 transition-none retro-border shadow-[4px_4px_0_0_#1e3a8a] hover:translate-y-1 hover:shadow-none"
           >
             <Play className="mr-2 group-hover:fill-current" />
             <span className="flex flex-col items-start leading-tight">
@@ -63,7 +64,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ onStart2D, onStart3D, onGallery, on
 
           <button 
             onClick={onStart3D}
-            className="group flex items-center justify-center px-6 py-4 bg-pink-500 text-white font-bold text-xl border-4 border-pink-700 hover:bg-pink-400 hover:border-pink-500 transition-none retro-border shadow-[4px_4px_0_0_#9d174d] hover:translate-y-1 hover:shadow-none"
+            className="group flex items-center justify-center px-6 py-3 bg-pink-500 text-white font-bold text-lg border-4 border-pink-700 hover:bg-pink-400 hover:border-pink-500 transition-none retro-border shadow-[4px_4px_0_0_#9d174d] hover:translate-y-1 hover:shadow-none"
           >
             <Sparkles className="mr-2" />
             <span className="flex flex-col items-start leading-tight">
@@ -74,7 +75,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ onStart2D, onStart3D, onGallery, on
           
           <button 
             onClick={onGallery}
-            className="flex items-center justify-center px-6 py-4 bg-white border-4 border-blue-500 text-blue-600 font-bold text-xl hover:bg-pink-50 hover:border-pink-400 hover:text-pink-500 transition-none retro-border shadow-[4px_4px_0_0_#93c5fd] hover:translate-y-1 hover:shadow-none"
+            className="flex items-center justify-center px-6 py-3 bg-white border-4 border-blue-500 text-blue-600 font-bold text-lg hover:bg-pink-50 hover:border-pink-400 hover:text-pink-500 transition-none retro-border shadow-[4px_4px_0_0_#93c5fd] hover:translate-y-1 hover:shadow-none"
           >
             <BookHeart className="mr-2" /> 记忆图鉴
           </button>
@@ -82,16 +83,16 @@ const MainMenu: React.FC<MainMenuProps> = ({ onStart2D, onStart3D, onGallery, on
           {onSkinSelect && (
             <button 
               onClick={onSkinSelect}
-              className="flex items-center justify-center px-6 py-4 bg-white border-4 border-blue-500 text-blue-600 font-bold text-xl hover:bg-blue-50 hover:border-blue-400 transition-none retro-border shadow-[4px_4px_0_0_#93c5fd] hover:translate-y-1 hover:shadow-none"
+              className="flex items-center justify-center px-6 py-3 bg-white border-4 border-blue-500 text-blue-600 font-bold text-lg hover:bg-blue-50 hover:border-blue-400 transition-none retro-border shadow-[4px_4px_0_0_#93c5fd] hover:translate-y-1 hover:shadow-none"
             >
               <Shirt className="mr-2" /> 外观选择
             </button>
           )}
 
-          {isGameCleared && (
+          {hasSpecialCG && (
              <button 
                 onClick={() => { setShowCG(true); setImgError(false); }}
-                className="flex items-center justify-center px-6 py-4 bg-pink-500 border-4 border-pink-700 text-white font-bold text-xl hover:bg-pink-400 transition-none retro-border shadow-[4px_4px_0_0_#be185d] hover:translate-y-1 hover:shadow-none animate-pulse"
+                className="flex items-center justify-center px-6 py-3 bg-pink-500 border-4 border-pink-700 text-white font-bold text-lg hover:bg-pink-400 transition-none retro-border shadow-[4px_4px_0_0_#be185d] hover:translate-y-1 hover:shadow-none animate-pulse"
              >
                 <Star className="mr-2" /> 特别回顾
              </button>
@@ -99,7 +100,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ onStart2D, onStart3D, onGallery, on
         </div>
       </div>
       
-      <div className="absolute bottom-8 text-blue-400 text-xs animate-pulse">
+      <div className="mt-8 text-blue-400 text-xs animate-pulse z-10">
          按 [Q] 键切换现实与漫画
       </div>
 

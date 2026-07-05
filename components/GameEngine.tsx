@@ -38,6 +38,67 @@ const createHalftoneCanvas = (): HTMLCanvasElement => {
   return c;
 };
 
+// 室友姐 2D 像素形象（橘发猫耳，会朝玩家挥手）
+const drawNovus = (
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number, h: number,
+  frame: number, playerX: number
+) => {
+  const faceRight = playerX > x + w / 2;
+  const bob = Math.sin(frame * 0.06) * 2;
+  const cx = x + w / 2;
+  ctx.save();
+  ctx.translate(cx, y + bob);
+  if (!faceRight) ctx.scale(-1, 1);
+  ctx.translate(-w / 2, 0);
+
+  // 腿
+  ctx.fillStyle = '#ffe9d9';
+  ctx.fillRect(w * 0.25, h * 0.72, w * 0.16, h * 0.24);
+  ctx.fillRect(w * 0.56, h * 0.72, w * 0.16, h * 0.24);
+  ctx.fillStyle = '#8a5a3b';
+  ctx.fillRect(w * 0.22, h * 0.92, w * 0.22, h * 0.08);
+  ctx.fillRect(w * 0.53, h * 0.92, w * 0.22, h * 0.08);
+  // 奶油色上衣
+  ctx.fillStyle = '#fdf3e2';
+  ctx.fillRect(w * 0.14, h * 0.4, w * 0.72, h * 0.35);
+  // 挥手的手臂
+  const wave = Math.sin(frame * 0.25) * 0.5;
+  ctx.save();
+  ctx.translate(w * 0.82, h * 0.45);
+  ctx.rotate(-1.9 + wave);
+  ctx.fillStyle = '#fdf3e2';
+  ctx.fillRect(-w * 0.07, 0, w * 0.14, h * 0.26);
+  ctx.fillStyle = '#ffe9d9';
+  ctx.fillRect(-w * 0.06, h * 0.24, w * 0.12, h * 0.09);
+  ctx.restore();
+  // 头
+  ctx.fillStyle = '#ffe9d9';
+  ctx.fillRect(w * 0.16, h * 0.06, w * 0.68, h * 0.34);
+  // 橘发：刘海 + 侧发
+  ctx.fillStyle = '#d97742';
+  ctx.fillRect(w * 0.12, h * 0.02, w * 0.76, h * 0.13);
+  ctx.fillRect(w * 0.1, h * 0.06, w * 0.14, h * 0.36);
+  ctx.fillRect(w * 0.76, h * 0.06, w * 0.14, h * 0.36);
+  // 猫耳
+  ctx.beginPath();
+  ctx.moveTo(w * 0.2, h * 0.05); ctx.lineTo(w * 0.3, h * -0.12); ctx.lineTo(w * 0.4, h * 0.03); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(w * 0.6, h * 0.03); ctx.lineTo(w * 0.7, h * -0.12); ctx.lineTo(w * 0.8, h * 0.05); ctx.fill();
+  // 眯眯笑眼 + 腮红
+  ctx.strokeStyle = '#5b3a29';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(w * 0.38, h * 0.24, w * 0.07, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+  ctx.beginPath(); ctx.arc(w * 0.66, h * 0.24, w * 0.07, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+  ctx.fillStyle = '#fda4af';
+  ctx.fillRect(w * 0.28, h * 0.3, w * 0.1, h * 0.04);
+  ctx.fillRect(w * 0.62, h * 0.3, w * 0.1, h * 0.04);
+  // 微笑
+  ctx.strokeStyle = '#c2554d';
+  ctx.beginPath(); ctx.arc(w * 0.52, h * 0.3, w * 0.06, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke();
+  ctx.restore();
+};
+
 const drawDousha = (
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -543,6 +604,8 @@ const GameEngine: React.FC<GameEngineProps> = ({ levelConfig, onFinishLevel, onE
           ctx.fillStyle = ent.color || '#000000';
           const floatY = Math.sin(frame * 0.05 + ent.x) * 5;
           ctx.fillText(ent.text || '', ent.x, ent.y + floatY);
+        } else if (ent.type === EntityType.NPC) {
+          drawNovus(ctx, ent.x, ent.y, ent.w, ent.h, frame, player.x);
         }
       });
 

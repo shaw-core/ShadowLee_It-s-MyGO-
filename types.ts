@@ -20,7 +20,8 @@ export enum EntityType {
   GOAL = 'GOAL',
   COLLECTIBLE_PAGE = 'COLLECTIBLE_PAGE',
   COLLECTIBLE_SHARD = 'COLLECTIBLE_SHARD',
-  TEXT = 'TEXT' // New entity for Easter eggs
+  TEXT = 'TEXT', // New entity for Easter eggs
+  NPC = 'NPC' // 剧情角色（无碰撞）
 }
 
 export interface Rect {

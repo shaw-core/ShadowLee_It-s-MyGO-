@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { Layer, LevelResult } from '../types';
 import { Level3D, Entity3D } from '../game3d/levels3d';
 import { SkinId, buildCharacter } from '../game3d/characters3d';
-import { BookOpen, Diamond, RotateCcw, Home, FastForward, Flag } from 'lucide-react';
+import { BookOpen, Candy, RotateCcw, Home, FastForward, Flag } from 'lucide-react';
 
 interface GameEngineProps {
   levelConfig: Level3D;
@@ -133,6 +133,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
   const [canSwitch, setCanSwitch] = useState(true);
   const [collectedItems, setCollectedItems] = useState<Set<string>>(new Set());
   const [checkpointHit, setCheckpointHit] = useState(false);
+  const [dizzyLevel, setDizzyLevel] = useState(0);
   const [showTitle, setShowTitle] = useState(true);
 
   const stateRef = useRef({
@@ -143,6 +144,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
     cam: { yaw: -Math.PI / 2, pitch: 0.42, dist: 9 },
     collected: new Set<string>(),
     isDead: false,
+    dizzy: 0,
     lastSwitch: 0,
     t: 0,
     deaths: 0,
@@ -171,10 +173,12 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
     s.p.vx = 0; s.p.vy = 0; s.p.vz = 0;
     s.collected.clear();
     s.isDead = false;
+    s.dizzy = 0;
     s.t = 0; s.deaths = 0;
     s.startTime = Date.now();
     layerRef.current = Layer.REAL;
     setCollectedItems(new Set());
+    setDizzyLevel(0);
     setCheckpointHit(false);
     setCurrentLayer(Layer.REAL);
     applyLayerRef.current(Layer.REAL);
@@ -185,6 +189,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
     const s = stateRef.current;
     if (now - s.lastSwitch > LAYER_COOLDOWN) {
       s.lastSwitch = now;
+      s.dizzy = Math.min(100, s.dizzy + 16);
       const next = layerRef.current === Layer.REAL ? Layer.MANGA : Layer.REAL;
       layerRef.current = next;
       setCurrentLayer(next);
@@ -337,15 +342,15 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
         halo.rotation.x = Math.PI / 2;
         g.add(page, halo);
         push(e, g, { hw: 0.55, hh: 0.65, hd: 0.55 },
-          (_l, active) => { g.visible = active; },
+          (_l, active) => { g.visible = active && !stateRef.current.collected.has(e.id); },
           (t) => { page.rotation.y = t * 1.6; page.position.y = Math.sin(t * 2.4) * 0.12; halo.position.y = -0.5 + Math.sin(t * 2.4) * 0.05; });
       } else if (e.type === 'SHARD') {
         const shard = new THREE.Mesh(new THREE.OctahedronGeometry(0.3),
-          new THREE.MeshStandardMaterial({ color: 0x60a5fa, emissive: 0x1d4ed8, emissiveIntensity: 0.45, flatShading: true }));
+          new THREE.MeshStandardMaterial({ color: 0x6ee7b7, emissive: 0x047857, emissiveIntensity: 0.5, flatShading: true }));
         shard.castShadow = true;
         g.add(shard);
         push(e, g, { hw: 0.5, hh: 0.55, hd: 0.5 },
-          (_l, active) => { g.visible = active; },
+          (_l, active) => { g.visible = active && !stateRef.current.collected.has(e.id); },
           (t) => { shard.rotation.y = t * 2; shard.position.y = Math.sin(t * 2.4 + e.x) * 0.12; });
       } else if (e.type === 'CHECKPOINT') {
         const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.4, 6),
@@ -439,12 +444,23 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
     const rig = buildCharacter(skin);
     scene.add(rig.group);
 
+    // ---- 室友姐 NPC：先走一步，在终点门旁等你（她不受次元影响，始终是彩色的） ----
+    const goalEnt = levelConfig.entities.find(en => en.type === 'GOAL');
+    let novus: ReturnType<typeof buildCharacter> | null = null;
+    let novusHeartT = 0;
+    if (goalEnt && skin !== 'skinNovus') {
+      novus = buildCharacter('skinNovus');
+      novus.group.position.set(goalEnt.x, goalEnt.y - 1.3, goalEnt.z + 1.6);
+      scene.add(novus.group);
+    }
+
     const s = stateRef.current;
     s.spawn = { ...levelConfig.spawn };
     s.p.x = s.spawn.x; s.p.y = s.spawn.y; s.p.z = s.spawn.z;
     s.p.vx = 0; s.p.vy = 0; s.p.vz = 0;
     s.collected.clear();
     s.isDead = false;
+    s.dizzy = 0;
     s.t = 0; s.deaths = 0;
     s.startTime = Date.now();
     layerRef.current = Layer.REAL;
@@ -516,18 +532,19 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
       }, 350);
     };
 
-    // ---- 单步物理（关键：基于穿透深度的逐轴解析，静止重叠不再瞬移） ----
-    const resolveAxis = (axis: 'x' | 'y' | 'z', solids: RtEnt[]) => {
+    // ---- 单步物理：逐轴解析 + "本轴原先在外侧"判定 ----
+    // 只有当玩家在本轴上原本位于实体外侧时才在本轴解析（重叠确实由本轴运动造成），
+    // 否则交给其他轴处理。这同时修复了静止瞬移和跳上移动平台被侧推的问题。
+    const resolveAxis = (axis: 'x' | 'y' | 'z', prevVal: number, solids: RtEnt[]) => {
       const half = axis === 'x' ? 'hw' : axis === 'y' ? 'hh' : 'hd';
       let landed: RtEnt | null = null;
       for (const e of solids) {
         if (!overlap(playerBox(), e)) continue;
-        const delta = s.p[axis] - e[axis];
-        const pen = (PLAYER as any)[half] + (e as any)[half] - Math.abs(delta);
-        if (pen <= 0) continue;
-        // 沿本轴按穿透深度最小推出，方向取玩家相对实体的一侧
-        const dir = delta >= 0 ? 1 : -1;
-        s.p[axis] += pen * dir;
+        const sum = (PLAYER as any)[half] + (e as any)[half];
+        const prevDelta = prevVal - e[axis];
+        if (Math.abs(prevDelta) < sum - 1e-4) continue; // 本轴原本就重叠 → 不是本轴造成的
+        const dir = prevDelta >= 0 ? 1 : -1;
+        s.p[axis] = e[axis] + sum * dir;
         const v = axis === 'x' ? 'vx' : axis === 'y' ? 'vy' : 'vz';
         // 只在速度朝向实体时清零，避免离开时被"粘住"
         if ((s.p as any)[v] * dir < 0) (s.p as any)[v] = 0;
@@ -560,6 +577,23 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
         p.y += p.groundEnt.y - p.groundEnt.prev.y;
         p.z += p.groundEnt.z - p.groundEnt.prev.z;
       }
+      // 平台移动撞进玩家：沿平台移动的主轴把玩家平推出去（不瞬移到另一侧）
+      for (const m of movers) {
+        if (m === p.groundEnt) continue;
+        if (m.ent.layerMask !== 'BOTH' && m.ent.layerMask !== layerRef.current) continue;
+        if (!overlap(playerBox(), m)) continue;
+        const dx = m.x - m.prev.x, dy = m.y - m.prev.y, dz = m.z - m.prev.z;
+        const ax = Math.abs(dx), ay = Math.abs(dy), az = Math.abs(dz);
+        if (ay >= ax && ay >= az && ay > 0) {
+          const dir = dy > 0 ? 1 : -1;
+          p.y = m.y + (m.hh + PLAYER.hh) * dir;
+          if (p.vy * dir < 0) p.vy = 0;
+        } else if (ax >= az && ax > 0) {
+          p.x = m.x + (m.hw + PLAYER.hw) * (dx > 0 ? 1 : -1);
+        } else if (az > 0) {
+          p.z = m.z + (m.hd + PLAYER.hd) * (dz > 0 ? 1 : -1);
+        }
+      }
 
       // 相机相对方向的输入
       const fx = -Math.sin(s.cam.yaw), fz = -Math.cos(s.cam.yaw);   // 前
@@ -572,8 +606,11 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
       const ilen = Math.hypot(ix, iz);
       if (ilen > 0) { ix /= ilen; iz /= ilen; }
 
+      // 晕3D：随时间恢复（静止恢复更快），高眩晕时脚步发飘
+      s.dizzy = Math.max(0, s.dizzy - (ilen > 0 || !p.grounded ? 3.5 : 9) * STEP);
+      const dizzyFactor = s.dizzy > 85 ? 0.72 : 1;
       // 加速度 + 摩擦
-      const targetVx = ix * MOVE_SPEED, targetVz = iz * MOVE_SPEED;
+      const targetVx = ix * MOVE_SPEED * dizzyFactor, targetVz = iz * MOVE_SPEED * dizzyFactor;
       const rate = ilen > 0 ? ACCEL : FRICTION;
       p.vx += Math.min(Math.abs(targetVx - p.vx), rate * STEP) * Math.sign(targetVx - p.vx);
       p.vz += Math.min(Math.abs(targetVz - p.vz), rate * STEP) * Math.sign(targetVz - p.vz);
@@ -593,20 +630,28 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
 
       const lists = physics[layerRef.current];
 
-      // 逐轴移动 + 解析
+      // 逐轴移动 + 解析（记录本轴移动前的位置用于方向判定）
+      const px0 = p.x;
       p.x += p.vx * STEP;
-      resolveAxis('x', lists.solids);
+      resolveAxis('x', px0, lists.solids);
+      const pz0 = p.z;
       p.z += p.vz * STEP;
-      resolveAxis('z', lists.solids);
+      resolveAxis('z', pz0, lists.solids);
+      const py0 = p.y;
+      const vyImpact = p.vy;
       p.y += p.vy * STEP;
-      const landedOn = resolveAxis('y', lists.solids);
+      const landedOn = resolveAxis('y', py0, lists.solids);
       p.grounded = !!landedOn;
       p.groundEnt = landedOn;
 
-      if (p.grounded && !wasGrounded && p.vy <= 0) {
+      if (p.grounded && !wasGrounded) {
         particles.burst(new THREE.Vector3(p.x, p.y - PLAYER.hh, p.z), 0xd6e4f5, 12, 2, 1.2);
+        if (vyImpact < -13) s.dizzy = Math.min(100, s.dizzy + Math.min(20, (-vyImpact - 13) * 2 + 8));
       }
       wasGrounded = p.grounded;
+      // 眩晕值同步到 HUD（避免每帧 setState）
+      const dz = Math.round(s.dizzy);
+      setDizzyLevel(prev => (Math.abs(prev - dz) >= 3 || (dz === 0 && prev !== 0) ? dz : prev));
 
       // 危险物 / 掉落
       for (const e of lists.hazards) {
@@ -631,8 +676,9 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
         if (!s.collected.has(e.ent.id) && overlap(playerBox(), e)) {
           s.collected.add(e.ent.id);
           e.group.visible = false;
+          s.dizzy = Math.max(0, s.dizzy - (e.ent.type === 'SHARD' ? 35 : 15));
           particles.burst(new THREE.Vector3(e.x, e.y, e.z),
-            e.ent.type === 'PAGE' ? 0xf472b6 : 0x60a5fa, 24, 2.5, 3);
+            e.ent.type === 'PAGE' ? 0xf472b6 : 0x6ee7b7, 24, 2.5, 3);
           setCollectedItems(new Set(s.collected));
         }
       }
@@ -689,6 +735,28 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
       }
 
       for (const r of ents) r.animate?.(t);
+      // 室友姐 NPC：望向你，靠近时挥手 + 爱心粒子
+      if (novus) {
+        const nx = novus.group.position.x, nz = novus.group.position.z;
+        const dxp = p.x - nx, dzp = p.z - nz;
+        const distN = Math.hypot(dxp, dzp);
+        let na = Math.atan2(dxp, dzp) - novus.group.rotation.y;
+        while (na > Math.PI) na -= Math.PI * 2;
+        while (na < -Math.PI) na += Math.PI * 2;
+        novus.group.rotation.y += na * 0.08;
+        novus.body.position.y = Math.sin(t * 2.2) * 0.03;
+        if (distN < 5) {
+          novus.armR.rotation.x = -2.5 + Math.sin(t * 7) * 0.45;
+          novus.head.rotation.z = Math.sin(t * 3) * 0.06;
+          novusHeartT += dt;
+          if (novusHeartT > 1.4) {
+            novusHeartT = 0;
+            particles.burst(new THREE.Vector3(nx, novus.group.position.y + 1.7, nz), 0xf472b6, 6, 1, 1.6);
+          }
+        } else {
+          novus.armR.rotation.x = Math.sin(t * 2.2) * 0.07;
+        }
+      }
       for (let i = 0; i < clouds.length; i++) {
         clouds[i].position.x += 0.25 * dt * ((i % 3) + 1);
         if (clouds[i].position.x > maxX + 14) clouds[i].position.x = -8;
@@ -702,8 +770,16 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
         p.y + Math.sin(cy.pitch) * cy.dist + 0.6,
         p.z + Math.cos(cy.yaw) * Math.cos(cy.pitch) * cy.dist,
       );
+      if (s.dizzy > 50) {
+        const k = (s.dizzy - 50) / 50;
+        camPos.x += Math.sin(s.t * 1.7) * 0.35 * k;
+        camPos.y += Math.sin(s.t * 2.3) * 0.2 * k;
+      }
       camera.position.lerp(camPos, 0.14);
       camera.lookAt(p.x, p.y + 0.7, p.z);
+      if (s.dizzy > 50) {
+        camera.rotation.z += Math.sin(s.t * 2.6) * 0.05 * ((s.dizzy - 50) / 50);
+      }
 
       sun.position.set(p.x + 10, p.y + 18, p.z + 8);
       sun.target.position.set(p.x, p.y, p.z);
@@ -757,13 +833,21 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
         </div>
       )}
 
-      <div className="absolute top-6 left-6 z-10 flex gap-4">
+      <div className="absolute top-6 left-6 z-10 flex items-center gap-3">
         <div className={`px-4 py-2 border-4 retro-border shadow-lg ${
             currentLayer === Layer.REAL
             ? 'bg-white border-blue-500 text-blue-900'
             : 'bg-black border-white text-white'
         }`}>
             {currentLayer === Layer.REAL ? '现实' : '漫画'}
+        </div>
+        {/* 晕3D 值：豆沙的老毛病 */}
+        <div className="flex flex-col gap-1 bg-white/85 border-4 border-purple-300 retro-border px-3 py-2 shadow-lg" title="李豆沙晕3D！切换次元和高处落地会加重，吃薄荷糖缓解">
+          <div className="text-[10px] font-bold text-purple-500 leading-none">晕3D {dizzyLevel >= 85 ? '呜…好晕…' : ''}</div>
+          <div className="w-24 h-2.5 bg-purple-100 border border-purple-300">
+            <div className={`h-full transition-all duration-200 ${dizzyLevel >= 85 ? 'bg-purple-600 animate-pulse' : dizzyLevel > 50 ? 'bg-purple-400' : 'bg-purple-300'}`}
+                 style={{ width: `${dizzyLevel}%` }} />
+          </div>
         </div>
       </div>
 
@@ -773,8 +857,8 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
                 <BookOpen size={18} />
                 <span>{pageCount}</span>
              </div>
-             <div className="px-3 py-2 bg-white border-4 border-blue-500 retro-border text-blue-500 flex items-center gap-2 shadow-lg">
-                <Diamond size={18} />
+             <div className="px-3 py-2 bg-white border-4 border-blue-500 retro-border text-emerald-500 flex items-center gap-2 shadow-lg" title="姐姐牌薄荷糖：清除眩晕">
+                <Candy size={18} />
                 <span>{shardCount}</span>
              </div>
          </div>
@@ -811,14 +895,22 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
          [WASD] 移动 | [空格] 跳跃 | [Q] 切换次元 | [鼠标拖动] 转视角 | [滚轮] 缩放
       </div>
 
-      <canvas
-        ref={canvasRef}
-        width={CANVAS_W}
-        height={CANVAS_H}
-        className={`border-4 transition-all duration-300 shadow-2xl cursor-grab active:cursor-grabbing ${
-            currentLayer === Layer.MANGA ? 'border-black filter grayscale contrast-125' : 'border-blue-900'
-        }`}
-      />
+      <div className="relative w-[min(96vw,1000px)]">
+        <canvas
+          ref={canvasRef}
+          width={CANVAS_W}
+          height={CANVAS_H}
+          className={`block w-full h-auto border-4 transition-all duration-300 shadow-2xl cursor-grab active:cursor-grabbing ${
+              currentLayer === Layer.MANGA ? 'border-black filter grayscale contrast-125' : 'border-blue-900'
+          }`}
+        />
+        {/* 晕3D 视觉：紫色暗角随眩晕加深 */}
+        <div className="absolute inset-0 pointer-events-none transition-opacity duration-500"
+             style={{
+               opacity: Math.max(0, (dizzyLevel - 45) / 55) * 0.6,
+               background: 'radial-gradient(ellipse at center, transparent 42%, rgba(109,40,217,0.55) 100%)',
+             }} />
+      </div>
     </div>
   );
 };

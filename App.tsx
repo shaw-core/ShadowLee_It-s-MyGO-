@@ -21,7 +21,7 @@ const SKIN_STORAGE_KEY = 'dousha3d_skin';
 const loadSkin = (): SkinId => {
   try {
     const v = localStorage.getItem(SKIN_STORAGE_KEY);
-    if (v === 'skin1' || v === 'skin2' || v === 'skin3' || v === 'skin4') return v;
+    if (v === 'skin1' || v === 'skin2' || v === 'skin3' || v === 'skin4' || v === 'skinNovus') return v;
   } catch { /* 隐私模式等场景下静默降级 */ }
   return 'skin1';
 };
@@ -205,6 +205,14 @@ const App: React.FC = () => {
   };
 
   const isFullCompletion = inventory.size >= TOTAL_2D + TOTAL_3D;
+  // 特殊CG：在前编第7关收集到实体后解锁展示
+  const hasSpecialCG = inventory.has('special_cg');
+  // 隐藏外观：集齐后编全部薄荷糖（碎片）解锁室友姐
+  const shard3dTotal = LEVELS3D.reduce((n, lv) => n + lv.entities.filter(e => e.type === 'SHARD').length, 0);
+  const shard3dOwned = Array.from(inventory).filter((id: string) => id.startsWith('shard3d_')).length;
+  const novusUnlocked = shard3dOwned >= shard3dTotal;
+  // 皮肤守卫：未解锁时回退默认外观
+  const effectiveSkin: SkinId = skin === 'skinNovus' && !novusUnlocked ? 'skin1' : skin;
 
   return (
     <div className="w-full min-h-screen bg-zinc-950">
@@ -218,13 +226,15 @@ const App: React.FC = () => {
           isGameCleared={cleared2D}
           is3DCleared={cleared3D}
           isFullCompletion={isFullCompletion}
+          hasSpecialCG={hasSpecialCG}
           onCheatUnlock={handleCheatUnlock}
         />
       )}
 
       {gameState === GameState.SKIN_SELECT && (
         <SkinSelect
-          currentSkin={skin}
+          currentSkin={effectiveSkin}
+          novusUnlocked={novusUnlocked}
           onConfirm={handleSkinConfirm}
           onBack={() => setGameState(GameState.MENU)}
         />
@@ -242,7 +252,7 @@ const App: React.FC = () => {
       {gameState === GameState.PLAYING && mode === '3d' && (
         <GameEngine3D
           levelConfig={LEVELS3D[currentLevelIndex]}
-          skin={skin}
+          skin={effectiveSkin}
           onFinishLevel={handleLevelFinish}
           onExit={() => setGameState(GameState.MENU)}
           isGameCleared={cleared3D}
