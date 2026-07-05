@@ -477,8 +477,8 @@ export const EVENTS: Record<string, YuriEvent> = {
       'door': {
         id: 'door',
         speakerName: '李豆沙',
-        text: "（门的光落在两个人身上。她朝我伸出手。）——走吧。不管那边是什么次元。",
-        choices: [{ id: 'e', text: "（牵住。→ 后编待续）", nextNodeId: null }]
+        text: "（门的光漫过天台，谁都没有说话。她的手在身侧，很轻地张开了一点。）",
+        choices: [{ id: 'e', text: "（装作不经意地，把手递了过去。→ 后编待续）", nextNodeId: null }]
       }
     }
   }

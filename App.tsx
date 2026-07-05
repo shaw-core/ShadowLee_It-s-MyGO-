@@ -12,6 +12,7 @@ import SkinSelect from './components/SkinSelect';
 import Gallery from './components/Gallery';
 import ResultScreen from './components/ResultScreen';
 import SecretEnding from './components/SecretEnding';
+import SpecialCG3D from './components/SpecialCG3D';
 
 type GameMode = '2d' | '3d';
 // 对话结束后要去哪
@@ -188,10 +189,13 @@ const App: React.FC = () => {
     if (next < total) {
       setCurrentLevelIndex(next);
       setGameState(GameState.PLAYING);
-    } else {
-      if (mode === '2d') setCleared2D(true);
-      else setCleared3D(true);
+    } else if (mode === '2d') {
+      setCleared2D(true);
       setGameState(GameState.MENU);
+    } else {
+      // 后编通关：直接进入 3D 特殊合影
+      setCleared3D(true);
+      setGameState(GameState.SPECIAL_CG_3D);
     }
   };
 
@@ -227,6 +231,7 @@ const App: React.FC = () => {
           is3DCleared={cleared3D}
           isFullCompletion={isFullCompletion}
           hasSpecialCG={hasSpecialCG}
+          onSpecialCG3D={() => { tryPlayMusic(); setGameState(GameState.SPECIAL_CG_3D); }}
           onCheatUnlock={handleCheatUnlock}
         />
       )}
@@ -278,6 +283,10 @@ const App: React.FC = () => {
           onBack={() => setGameState(GameState.MENU)}
           onReplayEvent={handleGalleryReplay}
         />
+      )}
+
+      {gameState === GameState.SPECIAL_CG_3D && (
+        <SpecialCG3D skin={effectiveSkin} onExit={() => setGameState(GameState.MENU)} />
       )}
 
       {gameState === GameState.SECRET_ENDING && (

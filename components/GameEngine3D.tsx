@@ -134,6 +134,16 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
   const [collectedItems, setCollectedItems] = useState<Set<string>>(new Set());
   const [checkpointHit, setCheckpointHit] = useState(false);
   const [dizzyLevel, setDizzyLevel] = useState(0);
+  const [stunned, setStunned] = useState(false);
+  const [shieldUsed, setShieldUsed] = useState(false);
+
+  // ---- 外观能力 ----
+  const dizzyEnabled = skin !== 'skinNovus';                  // 室友姐：不会晕3D
+  const dizzyMul = skin === 'skin1' ? 0.5 : 1;                // 睡衣版：眩晕增长减半
+  const candyRelief = skin === 'skin1' ? 60 : 40;             // 睡衣版：薄荷糖更有效
+  const switchCooldown = skin === 'skin2' ? 200 : LAYER_COOLDOWN; // 显示器头：切换冷却减半
+  const canDoubleJump = skin === 'skin3';                     // 熊猫外套：二段跳
+  const hasBandaid = skin === 'skin4';                        // 独眼露目：创可贴挡一次尖刺
   const [showTitle, setShowTitle] = useState(true);
 
   const stateRef = useRef({
@@ -145,6 +155,10 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
     collected: new Set<string>(),
     isDead: false,
     dizzy: 0,
+    stunT: 0,
+    airJumpOk: false,
+    shieldOk: false,
+    invulnT: 0,
     lastSwitch: 0,
     t: 0,
     deaths: 0,
@@ -187,17 +201,17 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
   const handleLayerSwitch = useCallback(() => {
     const now = Date.now();
     const s = stateRef.current;
-    if (now - s.lastSwitch > LAYER_COOLDOWN) {
+    if (now - s.lastSwitch > switchCooldown && s.stunT <= 0) {
       s.lastSwitch = now;
-      s.dizzy = Math.min(100, s.dizzy + 16);
+      if (dizzyEnabled) s.dizzy = Math.min(100, s.dizzy + 30 * dizzyMul);
       const next = layerRef.current === Layer.REAL ? Layer.MANGA : Layer.REAL;
       layerRef.current = next;
       setCurrentLayer(next);
       applyLayerRef.current(next);
       setCanSwitch(false);
-      setTimeout(() => setCanSwitch(true), LAYER_COOLDOWN);
+      setTimeout(() => setCanSwitch(true), switchCooldown);
     }
-  }, []);
+  }, [switchCooldown, dizzyEnabled, dizzyMul]);
 
   // ---- 键盘 ----
   useEffect(() => {
@@ -461,6 +475,10 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
     s.collected.clear();
     s.isDead = false;
     s.dizzy = 0;
+    s.stunT = 0;
+    s.airJumpOk = false;
+    s.shieldOk = true;
+    s.invulnT = 0;
     s.t = 0; s.deaths = 0;
     s.startTime = Date.now();
     layerRef.current = Layer.REAL;
@@ -527,6 +545,11 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
         s.p.vx = 0; s.p.vy = 0; s.p.vz = 0;
         s.keys.f = s.keys.b = s.keys.l = s.keys.r = false;
         s.isDead = false;
+        s.dizzy = Math.min(s.dizzy, 40);
+        s.stunT = 0;
+        s.shieldOk = true;
+        setShieldUsed(false);
+        setStunned(false);
         rig.group.visible = true;
         particles.burst(new THREE.Vector3(s.p.x, s.p.y, s.p.z), 0x93c5fd, 20, 2, 2.5);
       }, 350);
@@ -606,9 +629,25 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
       const ilen = Math.hypot(ix, iz);
       if (ilen > 0) { ix /= ilen; iz /= ilen; }
 
-      // 晕3D：随时间恢复（静止恢复更快），高眩晕时脚步发飘
-      s.dizzy = Math.max(0, s.dizzy - (ilen > 0 || !p.grounded ? 3.5 : 9) * STEP);
-      const dizzyFactor = s.dizzy > 85 ? 0.72 : 1;
+      // 晕3D：恢复变慢（移动中几乎不恢复），眩晕越高脚步越飘
+      if (dizzyEnabled) {
+        s.dizzy = Math.max(0, s.dizzy - (ilen > 0 || !p.grounded ? 1.2 : 5) * STEP);
+        // 晕到 100：原地晕倒 1.2 秒，然后缓回 55
+        if (s.dizzy >= 100 && s.stunT <= 0) {
+          s.stunT = 1.2;
+          setStunned(true);
+          particles.burst(new THREE.Vector3(p.x, p.y + 0.6, p.z), 0xa78bfa, 26, 2, 2.5);
+        }
+      }
+      if (s.stunT > 0) {
+        s.stunT -= STEP;
+        ix = 0; iz = 0;
+        s.jumpBufferT = 0;
+        if (s.stunT <= 0) { s.dizzy = 55; setStunned(false); }
+      }
+      s.invulnT = Math.max(0, s.invulnT - STEP);
+      // 眩晕 >60 开始明显影响移动（线性加重，100 时只剩 55% 速度）
+      const dizzyFactor = dizzyEnabled ? 1 - 0.45 * Math.max(0, (s.dizzy - 60) / 40) : 1;
       // 加速度 + 摩擦
       const targetVx = ix * MOVE_SPEED * dizzyFactor, targetVz = iz * MOVE_SPEED * dizzyFactor;
       const rate = ilen > 0 ? ACCEL : FRICTION;
@@ -618,11 +657,18 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
       // 土狼时间 + 跳跃缓冲
       s.coyoteT = p.grounded ? COYOTE_TIME : Math.max(0, s.coyoteT - STEP);
       s.jumpBufferT = Math.max(0, s.jumpBufferT - STEP);
+      if (p.grounded) s.airJumpOk = true;
       if (s.jumpBufferT > 0 && s.coyoteT > 0) {
         p.vy = JUMP_V;
         s.jumpBufferT = 0; s.coyoteT = 0;
         p.grounded = false;
         particles.burst(new THREE.Vector3(p.x, p.y - PLAYER.hh, p.z), 0xffffff, 10, 1.5, 1);
+      } else if (s.jumpBufferT > 0 && canDoubleJump && s.airJumpOk && !p.grounded && s.coyoteT <= 0) {
+        // 二段跳：冒险家专属
+        p.vy = JUMP_V * 0.92;
+        s.jumpBufferT = 0;
+        s.airJumpOk = false;
+        particles.burst(new THREE.Vector3(p.x, p.y - PLAYER.hh, p.z), 0x93e6c8, 16, 2.2, 1.5);
       }
 
       p.vy -= GRAVITY * STEP;
@@ -646,16 +692,30 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
 
       if (p.grounded && !wasGrounded) {
         particles.burst(new THREE.Vector3(p.x, p.y - PLAYER.hh, p.z), 0xd6e4f5, 12, 2, 1.2);
-        if (vyImpact < -13) s.dizzy = Math.min(100, s.dizzy + Math.min(20, (-vyImpact - 13) * 2 + 8));
+        if (dizzyEnabled && vyImpact < -11) s.dizzy = Math.min(100, s.dizzy + Math.min(30, ((-vyImpact - 11) * 2.5 + 12)) * dizzyMul);
       }
       wasGrounded = p.grounded;
       // 眩晕值同步到 HUD（避免每帧 setState）
       const dz = Math.round(s.dizzy);
       setDizzyLevel(prev => (Math.abs(prev - dz) >= 3 || (dz === 0 && prev !== 0) ? dz : prev));
 
-      // 危险物 / 掉落
-      for (const e of lists.hazards) {
-        if (overlap(playerBox(), e)) { respawn(); return false; }
+      // 危险物 / 掉落（创可贴：每个存档点区间抵挡一次尖刺）
+      if (s.invulnT <= 0) {
+        for (const e of lists.hazards) {
+          if (overlap(playerBox(), e)) {
+            if (hasBandaid && s.shieldOk) {
+              s.shieldOk = false;
+              s.invulnT = 1.2;
+              p.vy = 7.5;
+              if (dizzyEnabled) s.dizzy = Math.min(100, s.dizzy + 20);
+              particles.burst(new THREE.Vector3(p.x, p.y, p.z), 0xf5d7b8, 22, 2.5, 3);
+              setShieldUsed(true);
+            } else {
+              respawn(); return false;
+            }
+            break;
+          }
+        }
       }
       if (p.y < KILL_Y) { respawn(); return false; }
 
@@ -665,6 +725,8 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
           e.activated = true;
           (e as any).setActivated?.();
           s.spawn = { x: e.x, y: e.y + 0.8, z: e.z };
+          s.shieldOk = true;
+          setShieldUsed(false);
           particles.burst(new THREE.Vector3(e.x, e.y + 0.5, e.z), 0xf472b6, 26, 2.5, 3);
           setCheckpointHit(true);
           setTimeout(() => setCheckpointHit(false), 1500);
@@ -676,7 +738,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
         if (!s.collected.has(e.ent.id) && overlap(playerBox(), e)) {
           s.collected.add(e.ent.id);
           e.group.visible = false;
-          s.dizzy = Math.max(0, s.dizzy - (e.ent.type === 'SHARD' ? 35 : 15));
+          if (dizzyEnabled) s.dizzy = Math.max(0, s.dizzy - (e.ent.type === 'SHARD' ? candyRelief : 15));
           particles.burst(new THREE.Vector3(e.x, e.y, e.z),
             e.ent.type === 'PAGE' ? 0xf472b6 : 0x6ee7b7, 24, 2.5, 3);
           setCollectedItems(new Set(s.collected));
@@ -705,6 +767,8 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
 
       // 角色姿态
       rig.group.position.set(p.x, p.y - PLAYER.hh, p.z);
+      if (s.invulnT > 0) rig.group.visible = Math.sin(s.t * 30) > -0.3;
+      else if (!s.isDead) rig.group.visible = true;
       const moving = Math.hypot(p.vx, p.vz) > 0.4;
       if (moving) facing = Math.atan2(p.vx, p.vz);
       let da = facing - rig.group.rotation.y;
@@ -713,7 +777,12 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
       rig.group.rotation.y += da * 0.22;
 
       const t = s.t;
-      if (!p.grounded) {
+      if (s.stunT > 0) {
+        rig.group.rotation.y += 0.12;
+        rig.head.rotation.z = Math.sin(t * 9) * 0.25;
+        rig.body.position.y = -0.08;
+        rig.legL.rotation.x = 0.2; rig.legR.rotation.x = -0.2;
+      } else if (!p.grounded) {
         rig.legL.rotation.x = -0.65; rig.legR.rotation.x = 0.35;
         rig.armR.rotation.x = -2.4;
         if (skin !== 'skin1' && skin !== 'skin2') rig.armL.rotation.x = -2.4;
@@ -770,15 +839,15 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
         p.y + Math.sin(cy.pitch) * cy.dist + 0.6,
         p.z + Math.cos(cy.yaw) * Math.cos(cy.pitch) * cy.dist,
       );
-      if (s.dizzy > 50) {
-        const k = (s.dizzy - 50) / 50;
-        camPos.x += Math.sin(s.t * 1.7) * 0.35 * k;
-        camPos.y += Math.sin(s.t * 2.3) * 0.2 * k;
+      if (s.dizzy > 35) {
+        const k = (s.dizzy - 35) / 65;
+        camPos.x += Math.sin(s.t * 1.7) * 0.5 * k;
+        camPos.y += Math.sin(s.t * 2.3) * 0.3 * k;
       }
       camera.position.lerp(camPos, 0.14);
       camera.lookAt(p.x, p.y + 0.7, p.z);
-      if (s.dizzy > 50) {
-        camera.rotation.z += Math.sin(s.t * 2.6) * 0.05 * ((s.dizzy - 50) / 50);
+      if (s.dizzy > 35) {
+        camera.rotation.z += Math.sin(s.t * 2.6) * 0.075 * ((s.dizzy - 35) / 65);
       }
 
       sun.position.set(p.x + 10, p.y + 18, p.z + 8);
@@ -841,13 +910,25 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
         }`}>
             {currentLayer === Layer.REAL ? '现实' : '漫画'}
         </div>
-        {/* 晕3D 值：豆沙的老毛病 */}
-        <div className="flex flex-col gap-1 bg-white/85 border-4 border-purple-300 retro-border px-3 py-2 shadow-lg" title="李豆沙晕3D！切换次元和高处落地会加重，吃薄荷糖缓解">
-          <div className="text-[10px] font-bold text-purple-500 leading-none">晕3D {dizzyLevel >= 85 ? '呜…好晕…' : ''}</div>
-          <div className="w-24 h-2.5 bg-purple-100 border border-purple-300">
-            <div className={`h-full transition-all duration-200 ${dizzyLevel >= 85 ? 'bg-purple-600 animate-pulse' : dizzyLevel > 50 ? 'bg-purple-400' : 'bg-purple-300'}`}
-                 style={{ width: `${dizzyLevel}%` }} />
+        {/* 晕3D 值：豆沙的老毛病（室友姐不受影响） */}
+        {dizzyEnabled && (
+          <div className="flex flex-col gap-1 bg-white/85 border-4 border-purple-300 retro-border px-3 py-2 shadow-lg" title="李豆沙晕3D！切换次元和高处落地会加重，吃薄荷糖缓解，晕满会当场倒下！">
+            <div className="text-[10px] font-bold text-purple-500 leading-none">
+              晕3D {stunned ? '晕倒了！！' : dizzyLevel >= 80 ? '呜…好晕…' : ''}
+            </div>
+            <div className="w-24 h-2.5 bg-purple-100 border border-purple-300">
+              <div className={`h-full transition-all duration-200 ${stunned || dizzyLevel >= 80 ? 'bg-purple-600 animate-pulse' : dizzyLevel > 40 ? 'bg-purple-400' : 'bg-purple-300'}`}
+                   style={{ width: `${dizzyLevel}%` }} />
+            </div>
           </div>
+        )}
+        {/* 外观能力徽章 */}
+        <div className="px-3 py-2 bg-white/85 border-4 border-emerald-300 retro-border text-emerald-700 text-xs font-bold shadow-lg">
+          {skin === 'skin1' && '☁ 安心毛绒'}
+          {skin === 'skin2' && '⚡ 高速处理'}
+          {skin === 'skin3' && '★ 二段跳'}
+          {skin === 'skin4' && (shieldUsed ? '✕ 创可贴(已用)' : '✚ 创可贴')}
+          {skin === 'skinNovus' && '∞ 次元之外'}
         </div>
       </div>
 
@@ -878,6 +959,12 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
              <Home size={20} />
          </button>
       </div>
+
+      {stunned && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 text-purple-600 font-bold text-2xl bg-white/90 border-4 border-purple-400 px-6 py-2 retro-border shadow-lg pointer-events-none animate-pulse">
+          @_@ 转晕了……
+        </div>
+      )}
 
       {checkpointHit && (
         <div className="absolute top-40 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 text-pink-500 font-bold bg-white/90 border-2 border-pink-400 px-4 py-1 rounded shadow pointer-events-none">

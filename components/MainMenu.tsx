@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Play, BookHeart, Star, X, ImageOff, Sparkles, Shirt } from 'lucide-react';
+import { Play, BookHeart, Star, X, ImageOff, Sparkles, Shirt, Camera } from 'lucide-react';
 import { SPECIAL_CG_URL } from '../constants';
 
 interface MainMenuProps {
@@ -12,10 +12,11 @@ interface MainMenuProps {
   is3DCleared?: boolean;       // 后编（3D）通关
   isFullCompletion?: boolean;
   hasSpecialCG?: boolean;
+  onSpecialCG3D?: () => void;
   onCheatUnlock?: () => void; // New cheat prop
 }
 
-const MainMenu: React.FC<MainMenuProps> = ({ onStart2D, onStart3D, onGallery, onSkinSelect, onSecretEnding, isGameCleared, is3DCleared, isFullCompletion, hasSpecialCG, onCheatUnlock }) => {
+const MainMenu: React.FC<MainMenuProps> = ({ onStart2D, onStart3D, onGallery, onSkinSelect, onSecretEnding, isGameCleared, is3DCleared, isFullCompletion, hasSpecialCG, onSpecialCG3D, onCheatUnlock }) => {
   const [showCG, setShowCG] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [clickCount, setClickCount] = useState(0);
@@ -87,6 +88,15 @@ const MainMenu: React.FC<MainMenuProps> = ({ onStart2D, onStart3D, onGallery, on
             >
               <Shirt className="mr-2" /> 外观选择
             </button>
+          )}
+
+          {is3DCleared && onSpecialCG3D && (
+             <button
+                onClick={onSpecialCG3D}
+                className="flex items-center justify-center px-6 py-3 bg-orange-400 border-4 border-orange-600 text-white font-bold text-lg hover:bg-orange-300 transition-none retro-border shadow-[4px_4px_0_0_#9a3412] hover:translate-y-1 hover:shadow-none"
+             >
+                <Camera className="mr-2" /> 后编 · 合影
+             </button>
           )}
 
           {hasSpecialCG && (
