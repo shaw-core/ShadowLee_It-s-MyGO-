@@ -979,7 +979,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
             ? 'bg-white border-blue-500 text-blue-900'
             : 'bg-black border-white text-white'
         }`}>
-            {currentLayer === Layer.REAL ? '现实' : '漫画'}
+            {currentLayer === Layer.REAL ? '现实' : '线框'}
         </div>
         {/* 晕3D 值：豆沙的老毛病（室友姐不受影响） */}
         {dizzyEnabled && !pandaMode && (
@@ -1057,7 +1057,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
       )}
 
       <div className="absolute bottom-4 left-4 text-xs md:text-sm text-blue-900 bg-white/60 px-2 py-1 rounded">
-         [WASD] 移动 | [空格] 跳跃 | [Q] 切换次元 | [鼠标拖动] 转视角 | [滚轮] 缩放
+         [WASD] 移动 | [空格] 跳跃 | [Q] 切换线框层 | [鼠标拖动] 转视角 | [滚轮] 缩放
       </div>
 
       <div className="relative" style={{ width: 'min(96vw, 138vh, 1000px)' }}>
