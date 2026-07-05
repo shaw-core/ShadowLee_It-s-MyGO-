@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
-import { Play, BookHeart, Star, X, ImageOff, Sparkles } from 'lucide-react';
+import { Play, BookHeart, Star, X, ImageOff, Sparkles, Shirt } from 'lucide-react';
 import { SPECIAL_CG_URL } from '../constants';
 
 interface MainMenuProps {
   onStart: () => void;
   onGallery: () => void;
+  onSkinSelect?: () => void;
   onSecretEnding?: () => void;
   isGameCleared: boolean;
   isFullCompletion?: boolean;
   onCheatUnlock?: () => void; // New cheat prop
 }
 
-const MainMenu: React.FC<MainMenuProps> = ({ onStart, onGallery, onSecretEnding, isGameCleared, isFullCompletion, onCheatUnlock }) => {
+const MainMenu: React.FC<MainMenuProps> = ({ onStart, onGallery, onSkinSelect, onSecretEnding, isGameCleared, isFullCompletion, onCheatUnlock }) => {
   const [showCG, setShowCG] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [clickCount, setClickCount] = useState(0);
@@ -60,6 +61,15 @@ const MainMenu: React.FC<MainMenuProps> = ({ onStart, onGallery, onSecretEnding,
           >
             <BookHeart className="mr-2" /> 记忆图鉴
           </button>
+
+          {onSkinSelect && (
+            <button 
+              onClick={onSkinSelect}
+              className="flex items-center justify-center px-6 py-4 bg-white border-4 border-blue-500 text-blue-600 font-bold text-xl hover:bg-blue-50 hover:border-blue-400 transition-none retro-border shadow-[4px_4px_0_0_#93c5fd] hover:translate-y-1 hover:shadow-none"
+            >
+              <Shirt className="mr-2" /> 外观选择
+            </button>
+          )}
 
           {isGameCleared && (
              <button 

@@ -2,7 +2,7 @@ import React from 'react';
 import { AffectionState } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Heart, ArrowLeft, PlayCircle } from 'lucide-react';
-import { EVENTS } from '../constants';
+import { EVENTS3D as EVENTS } from '../game3d/story3d';
 
 interface GalleryProps {
   affectionData: AffectionState[];

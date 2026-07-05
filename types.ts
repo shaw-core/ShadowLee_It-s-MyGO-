@@ -5,7 +5,8 @@ export enum GameState {
   RESULT = 'RESULT',
   DIALOGUE = 'DIALOGUE',
   GALLERY = 'GALLERY',
-  SECRET_ENDING = 'SECRET_ENDING'
+  SECRET_ENDING = 'SECRET_ENDING',
+  SKIN_SELECT = 'SKIN_SELECT'
 }
 
 export enum Layer {
