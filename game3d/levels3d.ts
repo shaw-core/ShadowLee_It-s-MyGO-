@@ -14,7 +14,8 @@ export type EntityType3D =
   | 'SHARD'       // 记忆碎片
   | 'CHECKPOINT'  // 存档旗
   | 'GOAL'        // 传送门
-  | 'TEXT';       // 提示文字
+  | 'TEXT'        // 提示文字
+  | 'TRIGGER';    // 隐形触发区（世界重排）
 
 export interface Entity3D {
   id: string;
@@ -27,6 +28,9 @@ export interface Entity3D {
   // MOVER 专用：
   moveTo?: { x: number; y: number; z: number };
   period?: number;                       // 一个来回的秒数
+  // 世界重排专用：
+  shiftTo?: { x: number; y: number; z: number };  // 被触发后平台滑向的位置
+  shiftGroup?: number;                             // 所属重排组
 }
 
 export interface Level3D {
@@ -148,10 +152,12 @@ export const LEVELS3D: Level3D[] = [
       P('l3_r4', 14.6, 2.7, -3.8, 3.0, 3.0, 'MANGA'),
       P('l3_r5', 14.9, 3.2, -7.4, 3.0, 3.0, 'REAL'),
       CP('l3_cp1', 14.9, 4.2, -7.4),
-      P('l3_r6', 12.9, 3.7, -10.4, 3.0, 3.0, 'MANGA'),
+      // ---- 世界重排：这三块初始悬在错误的位置，越过触发区后咔哒归位 ----
+      { id: 'l3_shift_trig', type: 'TRIGGER', x: 14.9, y: 4.2, z: -7.4, w: 4.5, h: 4, d: 4.5, layerMask: 'BOTH', shiftGroup: 1 },
+      { ...P('l3_r6', 15.5, 2.4, -13.8, 3.0, 3.0, 'MANGA'), shiftTo: { x: 12.9, y: 3.7, z: -10.4 }, shiftGroup: 1 },
       SH('shard3d_l3_2', 12.9, 5.1, -10.4),
-      P('l3_r7', 9.2, 4.2, -10.9, 3.0, 3.0, 'REAL'),
-      P('l3_r8', 6.0, 4.7, -8.6, 3.0, 3.0, 'MANGA'),
+      { ...P('l3_r7', 6.2, 2.8, -14.5, 3.0, 3.0, 'REAL'), shiftTo: { x: 9.2, y: 4.2, z: -10.9 }, shiftGroup: 1 },
+      { ...P('l3_r8', 2.4, 3.4, -11.5, 3.0, 3.0, 'MANGA'), shiftTo: { x: 6.0, y: 4.7, z: -8.6 }, shiftGroup: 1 },
       P('l3_r9', 5.8, 5.2, -4.9, 3.0, 3.0, 'REAL'),
       P('l3_r10', 8.6, 5.6, -3.4, 2.8, 2.8, 'MANGA'),
       // 塔顶大平台

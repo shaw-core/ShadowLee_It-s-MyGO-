@@ -13,6 +13,7 @@ import Gallery from './components/Gallery';
 import ResultScreen from './components/ResultScreen';
 import SecretEnding from './components/SecretEnding';
 import SpecialCG3D from './components/SpecialCG3D';
+import MatrixEnding from './components/MatrixEnding';
 
 type GameMode = '2d' | '3d';
 // 对话结束后要去哪
@@ -193,9 +194,9 @@ const App: React.FC = () => {
       setCleared2D(true);
       setGameState(GameState.MENU);
     } else {
-      // 后编通关：直接进入 3D 特殊合影
+      // 后编通关：黑屏 → 矩阵终端结局（合影可从主菜单回看）
       setCleared3D(true);
-      setGameState(GameState.SPECIAL_CG_3D);
+      setGameState(GameState.MATRIX_ENDING);
     }
   };
 
@@ -283,6 +284,10 @@ const App: React.FC = () => {
           onBack={() => setGameState(GameState.MENU)}
           onReplayEvent={handleGalleryReplay}
         />
+      )}
+
+      {gameState === GameState.MATRIX_ENDING && (
+        <MatrixEnding onExit={() => setGameState(GameState.MENU)} />
       )}
 
       {gameState === GameState.SPECIAL_CG_3D && (

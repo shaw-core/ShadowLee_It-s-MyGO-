@@ -125,6 +125,9 @@ interface RtEnt extends AABB {
   applyLayer: (layer: Layer, active: boolean) => void;
   animate?: (t: number) => void;
   activated?: boolean;        // CHECKPOINT 用
+  fired?: boolean;            // TRIGGER 用
+  shiftStart?: number;        // 重排动画开始时间（s.t）
+  shiftDone?: boolean;
 }
 
 const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLevel, onExit, isGameCleared }) => {
@@ -164,6 +167,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
     invulnT: 0,
     panda: false,
     typed: '',
+    shakeT: 0,
     lastSwitch: 0,
     t: 0,
     deaths: 0,
@@ -435,6 +439,9 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
             const s = 1 + Math.sin(t * 2.2) * 0.04;
             g.scale.set(s, s, s);
           });
+      } else if (e.type === 'TRIGGER') {
+        push(e, g, { hw: (e.w ?? 3) / 2, hh: (e.h ?? 3) / 2, hd: (e.d ?? 3) / 2 },
+          () => { g.visible = false; });
       } else if (e.type === 'TEXT') {
         const sp = makeTextSprite(e.text || '');
         g.add(sp);
@@ -546,6 +553,8 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
     };
     const physics = { [Layer.REAL]: listsFor(Layer.REAL), [Layer.MANGA]: listsFor(Layer.MANGA) };
     const movers = ents.filter(r => r.ent.type === 'MOVER');
+    const triggers = ents.filter(r => r.ent.type === 'TRIGGER');
+    const shifters = ents.filter(r => r.ent.shiftTo !== undefined);
 
     // ---- 相机操控（拖动环绕 / 滚轮缩放） ----
     let dragging = false;
@@ -642,6 +651,36 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
         m.z = m.base.z + (to.z - m.base.z) * phase;
         m.group.position.set(m.x, m.y, m.z);
       }
+
+      // 世界重排：触发区检测 + 平台滑向新位置
+      for (const tr of triggers) {
+        if (tr.fired) continue;
+        if (!overlap(playerBox(), tr)) continue;
+        tr.fired = true;
+        s.shakeT = 0.55;
+        setPandaToast('咔哒——世界重排了！');
+        setTimeout(() => setPandaToast(''), 2200);
+        for (const sh of shifters) {
+          if (sh.ent.shiftGroup !== tr.ent.shiftGroup) continue;
+          sh.shiftStart = s.t;
+          particles.burst(new THREE.Vector3(sh.x, sh.y + 0.5, sh.z), 0x94a3b8, 18, 2.5, 2);
+        }
+      }
+      for (const sh of shifters) {
+        if (sh.shiftStart === undefined || sh.shiftDone) continue;
+        const k = Math.min(1, (s.t - sh.shiftStart) / 0.7);
+        const ease = k * k * (3 - 2 * k);
+        const to = sh.ent.shiftTo!;
+        sh.x = sh.base.x + (to.x - sh.base.x) * ease;
+        sh.y = sh.base.y + (to.y - sh.base.y) * ease;
+        sh.z = sh.base.z + (to.z - sh.base.z) * ease;
+        sh.group.position.set(sh.x, sh.y, sh.z);
+        if (k >= 1) {
+          sh.shiftDone = true;
+          particles.burst(new THREE.Vector3(sh.x, sh.y + 0.5, sh.z), 0xffffff, 14, 2, 1.5);
+        }
+      }
+      s.shakeT = Math.max(0, s.shakeT - STEP);
 
       if (s.isDead) return false;
 
@@ -914,6 +953,11 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
         const k = (s.dizzy - 35) / 65;
         camPos.x += Math.sin(s.t * 1.7) * 0.5 * k;
         camPos.y += Math.sin(s.t * 2.3) * 0.3 * k;
+      }
+      if (s.shakeT > 0) {
+        const k2 = s.shakeT / 0.55;
+        camPos.x += (Math.random() - 0.5) * 0.35 * k2;
+        camPos.y += (Math.random() - 0.5) * 0.28 * k2;
       }
       camera.position.lerp(camPos, 0.14);
       camera.lookAt(p.x, p.y + 0.7, p.z);
