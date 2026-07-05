@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { Layer, LevelResult } from '../types';
 import { Level3D, Entity3D } from '../game3d/levels3d';
-import { SkinId, buildCharacter } from '../game3d/characters3d';
+import { SkinId, buildCharacter, buildPandaWitch, buildCheckpointPanda } from '../game3d/characters3d';
 import { BookOpen, Candy, RotateCcw, Home, FastForward, Flag } from 'lucide-react';
 
 interface GameEngineProps {
@@ -136,6 +136,9 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
   const [dizzyLevel, setDizzyLevel] = useState(0);
   const [stunned, setStunned] = useState(false);
   const [shieldUsed, setShieldUsed] = useState(false);
+  const [pandaMode, setPandaMode] = useState(false);
+  const [pandaToast, setPandaToast] = useState('');
+  const togglePandaRef = useRef<() => void>(() => {});
 
   // ---- 外观能力 ----
   const dizzyEnabled = skin !== 'skinNovus';                  // 室友姐：不会晕3D
@@ -148,7 +151,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
 
   const stateRef = useRef({
     p: { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, grounded: false, groundEnt: null as RtEnt | null },
-    keys: { f: false, b: false, l: false, r: false },
+    keys: { f: false, b: false, l: false, r: false, up: false, down: false },
     jumpBufferT: 0,
     coyoteT: 0,
     cam: { yaw: -Math.PI / 2, pitch: 0.42, dist: 9 },
@@ -159,6 +162,8 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
     airJumpOk: false,
     shieldOk: false,
     invulnT: 0,
+    panda: false,
+    typed: '',
     lastSwitch: 0,
     t: 0,
     deaths: 0,
@@ -203,7 +208,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
     const s = stateRef.current;
     if (now - s.lastSwitch > switchCooldown && s.stunT <= 0) {
       s.lastSwitch = now;
-      if (dizzyEnabled) s.dizzy = Math.min(100, s.dizzy + 30 * dizzyMul);
+      if (dizzyEnabled && !stateRef.current.panda) s.dizzy = Math.min(100, s.dizzy + 30 * dizzyMul);
       const next = layerRef.current === Layer.REAL ? Layer.MANGA : Layer.REAL;
       layerRef.current = next;
       setCurrentLayer(next);
@@ -217,12 +222,21 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       const s = stateRef.current;
+      // 彩蛋：随时输入 shadow 变身魔法熊猫
+      if (/^[a-z]$/i.test(e.key)) {
+        s.typed = (s.typed + e.key.toLowerCase()).slice(-6);
+        if (s.typed === 'shadow') {
+          s.typed = '';
+          togglePandaRef.current();
+        }
+      }
       switch (e.code) {
         case 'KeyW': case 'ArrowUp': e.preventDefault(); s.keys.f = true; break;
         case 'KeyS': case 'ArrowDown': e.preventDefault(); s.keys.b = true; break;
         case 'KeyA': case 'ArrowLeft': e.preventDefault(); s.keys.l = true; break;
         case 'KeyD': case 'ArrowRight': e.preventDefault(); s.keys.r = true; break;
-        case 'Space': e.preventDefault(); s.jumpBufferT = JUMP_BUFFER; break;
+        case 'Space': e.preventDefault(); s.jumpBufferT = JUMP_BUFFER; s.keys.up = true; break;
+        case 'ShiftLeft': case 'ShiftRight': s.keys.down = true; break;
         case 'KeyQ': if (!s.isDead) handleLayerSwitch(); break;
         case 'Escape': onExitRef.current(); break;
       }
@@ -234,6 +248,8 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
         case 'KeyS': case 'ArrowDown': k.b = false; break;
         case 'KeyA': case 'ArrowLeft': k.l = false; break;
         case 'KeyD': case 'ArrowRight': k.r = false; break;
+        case 'Space': k.up = false; break;
+        case 'ShiftLeft': case 'ShiftRight': k.down = false; break;
       }
     };
     window.addEventListener('keydown', down);
@@ -367,25 +383,42 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
           (_l, active) => { g.visible = active && !stateRef.current.collected.has(e.id); },
           (t) => { shard.rotation.y = t * 2; shard.position.y = Math.sin(t * 2.4 + e.x) * 0.12; });
       } else if (e.type === 'CHECKPOINT') {
-        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.4, 6),
-          new THREE.MeshStandardMaterial({ color: 0x94a3b8, flatShading: true }));
-        pole.position.y = 0.2;
-        const flagMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, flatShading: true, side: THREE.DoubleSide });
-        const flag = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.32, 0.03), flagMat);
-        flag.position.set(0.32, 0.72, 0);
-        pole.castShadow = true; flag.castShadow = true;
-        g.add(pole, flag);
+        const panda = buildCheckpointPanda();
+        panda.group.position.y = -0.55; // 让小熊猫坐在平台面上（实体中心略高于地面）
+        g.add(panda.group);
         const rt: RtEnt = {
           ent: e, group: g,
           x: e.x, y: e.y, z: e.z, hw: 0.8, hh: 1.0, hd: 0.8,
           base: new THREE.Vector3(e.x, e.y, e.z), prev: new THREE.Vector3(e.x, e.y, e.z),
           applyLayer: (_l, active) => { g.visible = active; },
-          animate: (t) => { flag.rotation.y = Math.sin(t * 3) * 0.15; },
+          animate: (t) => {
+            panda.group.rotation.y = Math.sin(t * 0.8) * 0.3;
+            panda.group.position.y = -0.55 + Math.abs(Math.sin(t * 2.4)) * 0.03;
+          },
         };
         g.position.set(e.x, e.y, e.z);
         scene.add(g);
         ents.push(rt);
-        (rt as any).setActivated = () => { flagMat.color.setHex(0xf472b6); };
+        (rt as any).setActivated = () => { panda.setActivated(); };
+      } else if (e.type === 'GOAL' && levelConfig.id === 5) {
+        // 终章：世界的裂缝（没对齐的接缝，发着呼吸般的光）
+        const crackMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+        const c1 = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 3.4), crackMat);
+        const c2 = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 2.2), crackMat);
+        c2.rotation.z = 0.18; c2.position.set(0.16, 0.5, 0.01);
+        const c3 = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 1.6), crackMat);
+        c3.rotation.z = -0.22; c3.position.set(-0.14, -0.7, 0.01);
+        const glowMat = new THREE.MeshBasicMaterial({ color: 0xfff3c8, transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false });
+        const glow = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 4.2), glowMat);
+        glow.position.z = -0.02;
+        g.add(glow, c1, c2, c3);
+        push(e, g, { hw: 1.0, hh: 1.7, hd: 0.9 },
+          (_l, active) => { g.visible = active; },
+          (t) => {
+            glowMat.opacity = 0.26 + Math.sin(t * 1.8) * 0.12;
+            const sy = 1 + Math.sin(t * 1.8) * 0.03;
+            g.scale.set(1, sy, 1);
+          });
       } else if (e.type === 'GOAL') {
         const ring1 = new THREE.Mesh(new THREE.TorusGeometry(1.05, 0.13, 6, 18),
           new THREE.MeshStandardMaterial({ color: 0xfbbf24, emissive: 0xb45309, emissiveIntensity: 0.5, flatShading: true }));
@@ -457,6 +490,22 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
     // ---- 玩家 ----
     const rig = buildCharacter(skin);
     scene.add(rig.group);
+    // 魔法熊猫（彩蛋变身体）
+    const pandaRig = buildPandaWitch();
+    pandaRig.group.visible = false;
+    scene.add(pandaRig.group);
+    const setPanda = (on: boolean) => {
+      s.panda = on;
+      if (!s.isDead) {
+        rig.group.visible = !on;
+        pandaRig.group.visible = on;
+      }
+      setPandaMode(on);
+      setPandaToast(on ? '✨ 变身魔法熊猫！空格上升 · Shift下降 · 再输 shadow 变回' : '变回来了！');
+      setTimeout(() => setPandaToast(''), 2800);
+      particles.burst(new THREE.Vector3(s.p.x, s.p.y + 0.5, s.p.z), on ? 0x8db8f5 : 0xf6d76b, 34, 3, 3.5);
+    };
+    togglePandaRef.current = () => setPanda(!s.panda);
 
     // ---- 室友姐 NPC：先走一步，在终点门旁等你（她不受次元影响，始终是彩色的） ----
     const goalEnt = levelConfig.entities.find(en => en.type === 'GOAL');
@@ -540,6 +589,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
       s.deaths += 1;
       particles.burst(new THREE.Vector3(s.p.x, s.p.y, s.p.z), 0xf87171, 30, 3.5, 3);
       rig.group.visible = false;
+      pandaRig.group.visible = false;
       respawnTimer = setTimeout(() => {
         s.p.x = s.spawn.x; s.p.y = s.spawn.y; s.p.z = s.spawn.z;
         s.p.vx = 0; s.p.vy = 0; s.p.vz = 0;
@@ -550,7 +600,8 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
         s.shieldOk = true;
         setShieldUsed(false);
         setStunned(false);
-        rig.group.visible = true;
+        rig.group.visible = !s.panda;
+        pandaRig.group.visible = s.panda;
         particles.burst(new THREE.Vector3(s.p.x, s.p.y, s.p.z), 0x93c5fd, 20, 2, 2.5);
       }, 350);
     };
@@ -631,7 +682,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
 
       // 晕3D：恢复变慢（移动中几乎不恢复），眩晕越高脚步越飘
       if (dizzyEnabled) {
-        s.dizzy = Math.max(0, s.dizzy - (ilen > 0 || !p.grounded ? 1.2 : 5) * STEP);
+        s.dizzy = Math.max(0, s.dizzy - (s.panda ? 8 : (ilen > 0 || !p.grounded ? 1.2 : 5)) * STEP);
         // 晕到 100：原地晕倒 1.2 秒，然后缓回 55
         if (s.dizzy >= 100 && s.stunT <= 0) {
           s.stunT = 1.2;
@@ -647,9 +698,10 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
       }
       s.invulnT = Math.max(0, s.invulnT - STEP);
       // 眩晕 >60 开始明显影响移动（线性加重，100 时只剩 55% 速度）
-      const dizzyFactor = dizzyEnabled ? 1 - 0.45 * Math.max(0, (s.dizzy - 60) / 40) : 1;
+      const dizzyFactor = (dizzyEnabled && !s.panda) ? 1 - 0.45 * Math.max(0, (s.dizzy - 60) / 40) : 1;
+      const moveSpd = s.panda ? MOVE_SPEED * 1.2 : MOVE_SPEED;
       // 加速度 + 摩擦
-      const targetVx = ix * MOVE_SPEED * dizzyFactor, targetVz = iz * MOVE_SPEED * dizzyFactor;
+      const targetVx = ix * moveSpd * dizzyFactor, targetVz = iz * moveSpd * dizzyFactor;
       const rate = ilen > 0 ? ACCEL : FRICTION;
       p.vx += Math.min(Math.abs(targetVx - p.vx), rate * STEP) * Math.sign(targetVx - p.vx);
       p.vz += Math.min(Math.abs(targetVz - p.vz), rate * STEP) * Math.sign(targetVz - p.vz);
@@ -657,6 +709,12 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
       // 土狼时间 + 跳跃缓冲
       s.coyoteT = p.grounded ? COYOTE_TIME : Math.max(0, s.coyoteT - STEP);
       s.jumpBufferT = Math.max(0, s.jumpBufferT - STEP);
+      if (s.panda) {
+        // 魔法熊猫：自由飞行
+        const tv = s.keys.up ? 4.8 : s.keys.down ? -4.8 : 0;
+        p.vy += (tv - p.vy) * Math.min(1, 12 * STEP);
+        s.jumpBufferT = 0;
+      } else {
       if (p.grounded) s.airJumpOk = true;
       if (s.jumpBufferT > 0 && s.coyoteT > 0) {
         p.vy = JUMP_V;
@@ -673,6 +731,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
 
       p.vy -= GRAVITY * STEP;
       if (p.vy < -20) p.vy = -20;
+      }
 
       const lists = physics[layerRef.current];
 
@@ -692,7 +751,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
 
       if (p.grounded && !wasGrounded) {
         particles.burst(new THREE.Vector3(p.x, p.y - PLAYER.hh, p.z), 0xd6e4f5, 12, 2, 1.2);
-        if (dizzyEnabled && vyImpact < -11) s.dizzy = Math.min(100, s.dizzy + Math.min(30, ((-vyImpact - 11) * 2.5 + 12)) * dizzyMul);
+        if (dizzyEnabled && !s.panda && vyImpact < -11) s.dizzy = Math.min(100, s.dizzy + Math.min(30, ((-vyImpact - 11) * 2.5 + 12)) * dizzyMul);
       }
       wasGrounded = p.grounded;
       // 眩晕值同步到 HUD（避免每帧 setState）
@@ -700,7 +759,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
       setDizzyLevel(prev => (Math.abs(prev - dz) >= 3 || (dz === 0 && prev !== 0) ? dz : prev));
 
       // 危险物 / 掉落（创可贴：每个存档点区间抵挡一次尖刺）
-      if (s.invulnT <= 0) {
+      if (s.invulnT <= 0 && !s.panda) {
         for (const e of lists.hazards) {
           if (overlap(playerBox(), e)) {
             if (hasBandaid && s.shieldOk) {
@@ -767,7 +826,19 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
 
       // 角色姿态
       rig.group.position.set(p.x, p.y - PLAYER.hh, p.z);
-      if (s.invulnT > 0) rig.group.visible = Math.sin(s.t * 30) > -0.3;
+      if (s.panda) {
+        pandaRig.group.position.set(p.x, p.y - PLAYER.hh + 0.1, p.z);
+        if (!s.isDead) { pandaRig.group.visible = true; rig.group.visible = false; }
+        const movingP = Math.hypot(p.vx, p.vz) > 0.4;
+        if (movingP) facing = Math.atan2(p.vx, p.vz);
+        let dap = facing - pandaRig.group.rotation.y;
+        while (dap > Math.PI) dap -= Math.PI * 2;
+        while (dap < -Math.PI) dap += Math.PI * 2;
+        pandaRig.group.rotation.y += dap * 0.18;
+        pandaRig.group.rotation.x = THREE.MathUtils.clamp(-p.vy * 0.045, -0.35, 0.3);
+        pandaRig.body.position.y = Math.sin(s.t * 3.2) * 0.06;
+        pandaRig.head.rotation.z = Math.sin(s.t * 2.1) * 0.05;
+      } else if (s.invulnT > 0) rig.group.visible = Math.sin(s.t * 30) > -0.3;
       else if (!s.isDead) rig.group.visible = true;
       const moving = Math.hypot(p.vx, p.vz) > 0.4;
       if (moving) facing = Math.atan2(p.vx, p.vz);
@@ -911,7 +982,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
             {currentLayer === Layer.REAL ? '现实' : '漫画'}
         </div>
         {/* 晕3D 值：豆沙的老毛病（室友姐不受影响） */}
-        {dizzyEnabled && (
+        {dizzyEnabled && !pandaMode && (
           <div className="flex flex-col gap-1 bg-white/85 border-4 border-purple-300 retro-border px-3 py-2 shadow-lg" title="李豆沙晕3D！切换次元和高处落地会加重，吃薄荷糖缓解，晕满会当场倒下！">
             <div className="text-[10px] font-bold text-purple-500 leading-none">
               晕3D {stunned ? '晕倒了！！' : dizzyLevel >= 80 ? '呜…好晕…' : ''}
@@ -924,11 +995,12 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
         )}
         {/* 外观能力徽章 */}
         <div className="px-3 py-2 bg-white/85 border-4 border-emerald-300 retro-border text-emerald-700 text-xs font-bold shadow-lg">
-          {skin === 'skin1' && '☁ 安心毛绒'}
-          {skin === 'skin2' && '⚡ 高速处理'}
-          {skin === 'skin3' && '★ 二段跳'}
-          {skin === 'skin4' && (shieldUsed ? '✕ 创可贴(已用)' : '✚ 创可贴')}
-          {skin === 'skinNovus' && '∞ 次元之外'}
+          {pandaMode && '✨ 魔法熊猫'}
+          {!pandaMode && skin === 'skin1' && '☁ 安心毛绒'}
+          {!pandaMode && skin === 'skin2' && '⚡ 高速处理'}
+          {!pandaMode && skin === 'skin3' && '★ 二段跳'}
+          {!pandaMode && skin === 'skin4' && (shieldUsed ? '✕ 创可贴(已用)' : '✚ 创可贴')}
+          {!pandaMode && skin === 'skinNovus' && '∞ 次元之外'}
         </div>
       </div>
 
@@ -960,6 +1032,12 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
          </button>
       </div>
 
+      {pandaToast && (
+        <div className="absolute top-32 left-1/2 -translate-x-1/2 z-20 text-indigo-600 font-bold bg-white/90 border-4 border-indigo-300 px-5 py-2 retro-border shadow-lg pointer-events-none whitespace-nowrap text-sm md:text-base">
+          {pandaToast}
+        </div>
+      )}
+
       {stunned && (
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 text-purple-600 font-bold text-2xl bg-white/90 border-4 border-purple-400 px-6 py-2 retro-border shadow-lg pointer-events-none animate-pulse">
           @_@ 转晕了……
@@ -982,7 +1060,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
          [WASD] 移动 | [空格] 跳跃 | [Q] 切换次元 | [鼠标拖动] 转视角 | [滚轮] 缩放
       </div>
 
-      <div className="relative w-[min(96vw,1000px)]">
+      <div className="relative" style={{ width: 'min(96vw, 138vh, 1000px)' }}>
         <canvas
           ref={canvasRef}
           width={CANVAS_W}

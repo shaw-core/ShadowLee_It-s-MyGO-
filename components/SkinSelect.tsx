@@ -84,13 +84,14 @@ const SkinSelect: React.FC<SkinSelectProps> = ({ currentSkin, novusUnlocked, onC
   const next = () => setIndex(i => (i + 1) % SKINS.length);
 
   return (
-    <div className="w-full min-h-screen py-8 flex flex-col items-center justify-center bg-[#FEF7CD] text-blue-900 font-pixel relative overflow-y-auto">
+    <div className="w-full h-screen flex flex-col items-center bg-[#FEF7CD] text-blue-900 font-pixel relative overflow-y-auto">
       <button onClick={onBack}
         className="absolute top-6 left-6 flex items-center text-blue-600 hover:text-blue-900 bg-white border-4 border-blue-200 px-4 py-2 hover:border-blue-500 shadow-md z-10">
         <ArrowLeft className="mr-2" size={18} /> 返回
       </button>
 
-      <h1 className="text-3xl md:text-4xl font-bold text-pink-500 drop-shadow-[2px_2px_0_#fff] mb-6">选择外观</h1>
+      <div className="my-auto flex flex-col items-center py-16">
+      <h1 className="text-2xl md:text-3xl font-bold text-pink-500 drop-shadow-[2px_2px_0_#fff] mb-4">选择外观</h1>
 
       <div className="flex items-center gap-4 md:gap-8">
         <button onClick={prev}
@@ -100,12 +101,12 @@ const SkinSelect: React.FC<SkinSelectProps> = ({ currentSkin, novusUnlocked, onC
 
         <div className="bg-white border-4 border-blue-300 retro-border shadow-[8px_8px_0_0_#93c5fd] p-4 flex flex-col items-center">
           {isLocked ? (
-            <div className="w-[320px] h-[380px] bg-gradient-to-b from-[#2a2438] to-[#443a5c] flex flex-col items-center justify-center text-white/80">
+            <div className="bg-gradient-to-b from-[#2a2438] to-[#443a5c] flex flex-col items-center justify-center text-white/80" style={{ width: 'min(60vw, 34vh, 300px)', aspectRatio: '320/380' }}>
               <span className="text-7xl font-bold mb-4">???</span>
               <span className="text-sm px-6 text-center leading-relaxed">在「后编 · 多边形篇」中<br/>集齐全部薄荷糖（碎片）解锁</span>
             </div>
           ) : (
-            <canvas ref={canvasRef} width={320} height={380} className="bg-gradient-to-b from-[#e8f4ff] to-[#FEF7CD]" />
+            <canvas ref={canvasRef} width={320} height={380} className="bg-gradient-to-b from-[#e8f4ff] to-[#FEF7CD] h-auto" style={{ width: 'min(60vw, 34vh, 300px)' }} />
           )}
           <div className="mt-3 text-xl font-bold text-blue-800">{isLocked ? '？？？' : skin.name}</div>
           <div className="text-sm text-pink-500 mb-2">{isLocked ? '？？？' : skin.vibe}</div>
@@ -121,7 +122,7 @@ const SkinSelect: React.FC<SkinSelectProps> = ({ currentSkin, novusUnlocked, onC
       </div>
 
       {/* 四格快速切换 */}
-      <div className="flex gap-3 mt-6">
+      <div className="flex gap-3 mt-4">
         {SKINS.map((sm, i) => {
           const lockedCell = sm.id === 'skinNovus' && !novusUnlocked;
           return (
@@ -143,6 +144,7 @@ const SkinSelect: React.FC<SkinSelectProps> = ({ currentSkin, novusUnlocked, onC
         }`}>
         <Check className="mr-2" /> {isLocked ? '尚未解锁' : '就决定是你了！'}
       </button>
+      </div>
     </div>
   );
 };

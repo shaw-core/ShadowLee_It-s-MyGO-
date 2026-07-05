@@ -31,7 +31,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ onStart2D, onStart3D, onGallery, on
   };
 
   return (
-    <div className="w-full min-h-screen py-10 flex flex-col items-center justify-center bg-[#FEF7CD] text-blue-900 relative overflow-y-auto font-pixel">
+    <div className="w-full h-screen flex flex-col items-center bg-[#FEF7CD] text-blue-900 relative overflow-y-auto font-pixel">
       {/* Background decoration */}
       <div className="absolute inset-0 z-0 opacity-20 pointer-events-none">
           <div className="absolute top-0 left-0 w-full h-full manga-pattern opacity-10"></div>
@@ -39,7 +39,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ onStart2D, onStart3D, onGallery, on
           <div className="absolute bottom-1/4 right-1/4 w-32 h-32 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl animate-pulse" style={{animationDelay: '1s'}}></div>
       </div>
 
-      <div className="z-10 text-center space-y-5">
+      <div className="z-10 text-center space-y-5 my-auto py-10">
         <h1 
             onClick={handleTitleClick}
             className="text-4xl md:text-6xl font-bold tracking-tighter mb-2 text-blue-600 drop-shadow-[4px_4px_0_#fff] cursor-pointer select-none active:scale-95 transition-transform"

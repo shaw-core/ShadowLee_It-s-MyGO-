@@ -155,10 +155,11 @@ const SpecialCG3D: React.FC<SpecialCG3DProps> = ({ skin, onExit }) => {
   }, [skin]);
 
   return (
-    <div className="w-full min-h-screen py-8 flex flex-col items-center justify-center bg-zinc-900 font-pixel overflow-y-auto">
+    <div className="w-full h-screen flex flex-col items-center bg-zinc-900 font-pixel overflow-y-auto">
       {/* 拍立得相框 */}
-      <div className="bg-white p-3 pb-16 shadow-[0_0_60px_rgba(244,114,182,0.35)] rotate-1 hover:rotate-0 transition-transform duration-500 relative max-w-[92vw]">
-        <canvas ref={canvasRef} width={760} height={560} className="block w-full h-auto max-w-[760px]" />
+      <div className="mt-auto pt-8" />
+      <div className="bg-white p-3 pb-16 shadow-[0_0_60px_rgba(244,114,182,0.35)] rotate-1 hover:rotate-0 transition-transform duration-500 relative" style={{ width: 'min(92vw, 110vh, 800px)' }}>
+        <canvas ref={canvasRef} width={760} height={560} className="block w-full h-auto" />
         <div className="absolute bottom-4 left-0 right-0 text-center">
           <p className="text-zinc-700 font-bold text-lg tracking-wide">後編・完 —— 新世界的第一张合影</p>
           <p className="text-zinc-400 text-xs mt-1 flex items-center justify-center gap-1">
@@ -168,9 +169,10 @@ const SpecialCG3D: React.FC<SpecialCG3DProps> = ({ skin, onExit }) => {
       </div>
 
       <button onClick={onExit}
-        className="mt-8 flex items-center px-8 py-3 bg-pink-500 text-white font-bold text-lg border-4 border-pink-700 hover:bg-pink-400 retro-border shadow-[4px_4px_0_0_#9d174d] hover:translate-y-1 hover:shadow-none">
+        className="mt-6 flex items-center px-8 py-3 bg-pink-500 text-white font-bold text-lg border-4 border-pink-700 hover:bg-pink-400 retro-border shadow-[4px_4px_0_0_#9d174d] hover:translate-y-1 hover:shadow-none">
         <Home className="mr-2" size={20} /> 返回主菜单
       </button>
+      <div className="mb-auto pb-8" />
     </div>
   );
 };

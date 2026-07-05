@@ -102,7 +102,7 @@ export const EVENTS3D: Record<string, YuriEvent> = {
       'soft': {
         id: 'soft',
         speakerName: '室友姐',
-        text: '嗯。不管是谁在画，这个人对这个世界很上心。（把草稿页折好递给你）收好。多捡几页，说不定能拼出这个世界的全貌。',
+        text: '嗯。不管执笔的是谁，先把他画下的东西记牢。（把草稿页折好递给你）收好。多捡几页，说不定能拼出这个世界的全貌——还有画它的人，到底想干什么。',
         choices: [{ id: 'e', text: '（小心地收进口袋）像收集地图碎片一样！', nextNodeId: 'end' }],
       },
       'special': {
@@ -178,7 +178,7 @@ export const EVENTS3D: Record<string, YuriEvent> = {
       'sis': {
         id: 'sis',
         speakerName: '室友姐',
-        text: '……真的。这里有橡皮擦的印子。（她伸手贴着那道线，很轻地）所以确实有一位"作者"。此时此刻，可能正在画我们站着的这座塔。',
+        text: '……真的。这里有橡皮擦的印子。（她伸手贴着那道线，声音放轻）所以，幕后确实有一个人在执笔。我们走过的每一块砖、你捡到的每一颗糖，可能都是被安排好的。',
         choices: [
           { id: 'c2a', text: '那、那如果作者哪天不想要这段了，把我们也擦掉怎么办？！', nextNodeId: 'deny' },
           { id: 'c2b', text: '改了三次……说明作者在很认真地琢磨这里。', affectionDelta: { charId: 'novus', amount: 15 }, nextNodeId: 'warm' },
@@ -233,13 +233,13 @@ export const EVENTS3D: Record<string, YuriEvent> = {
       'joke': {
         id: 'joke',
         speakerName: '室友姐',
-        text: '不是bug，是接缝。画到边界的地方，总会留一条没合上的缝。……如果这个世界有门，多半就开在那里。',
+        text: '不是bug。……不，也许恰恰就是bug——画到边界没合上的一道缝，世界的漏洞。这么周到的一位作者，画错了却不补，你不觉得奇怪吗？',
         choices: [{ id: 'c2', text: '（盯着那条线，心情突然复杂起来）找到出口了，怎么反而……', affectionDelta: { charId: 'novus', amount: 10 }, nextNodeId: 'end' }],
       },
       'why': {
         id: 'why',
         speakerName: '室友姐',
-        text: '嗯。找了四关的出口，就在那里。（她看着你）……怎么，表情不像高兴的样子。',
+        text: '嗯。想从这幅画里出去，恐怕只能走那条缝。（她收回手，声音低了一点）……怎么，表情不像高兴的样子。',
         choices: [
           { id: 'c2a', text: '高兴的！只是……这个世界也开始有点舍不得了。', nextNodeId: 'dodge' },
           { id: 'c2s', text: '【直球】出口在哪都行。我担心的从来只有一件事：门那边，你还在不在我旁边。', affectionDelta: { charId: 'novus', amount: 50 }, nextNodeId: 'special', requiresClear: true },
@@ -249,19 +249,19 @@ export const EVENTS3D: Record<string, YuriEvent> = {
       'dodge': {
         id: 'dodge',
         speakerName: '室友姐',
-        text: '舍不得就记住它。（她把外套脱下来，披在你肩上）风大。看够了再走，接缝又不会跑。',
+        text: '舍不得就记牢。（她把外套脱下来，披在你肩上）风大。到了缝跟前，不管看到什么——先抓住我。',
         choices: [{ id: 'e', text: '（外套上全是她的温度。）', affectionDelta: { charId: 'novus', amount: 10 }, nextNodeId: 'end' }],
       },
       'special': {
         id: 'special',
         speakerName: '室友姐',
-        text: '（很久没有说话。云从脚下飘过去。然后她把外套披在你肩上，手在你肩头停了一秒。）……哪边都一样。我的位置不归哪个世界管。',
+        text: '（很久没有说话。云从脚下飘过去。然后她把外套披在你肩上，手在你肩头停了一秒。）……缝的那头是哪里都一样。我的位置，不归哪位作者管。',
         choices: [{ id: 'e', text: '（攥紧了外套的边角。）', nextNodeId: 'end' }],
       },
       'end': {
         id: 'end',
         speakerName: '李豆沙',
-        text: '（这页草稿画的是云顶：两个小人并排坐着。作者连披外套的那一笔，都画进去了。——原来一直在看着我们。）',
+        text: '（这页草稿画的是云顶的两个小人。而在画的边缘，有一行没擦干净的铅笔小字："快到了。"——是在对我们说吗？）',
         choices: [{ id: 'e2', text: '……', nextNodeId: null }],
       },
     },
@@ -276,43 +276,43 @@ export const EVENTS3D: Record<string, YuriEvent> = {
       'start': {
         id: 'start',
         speakerName: '李豆沙',
-        text: '（世界的接缝处。把一路捡到的草稿页拼在一起——正好是这个世界的完整地图，而地图的最后一角，画着一扇门，就是眼前这扇。）……小室，作者把门，留在了给我们的图纸上。',
+        text: '（世界的裂缝前。把一路的草稿页拼在一起——地图上根本没有画"门"。最后一角画着的，就是眼前这道裂缝，旁边还有一个小小的箭头。）……小室，作者不是漏画了。他把这个漏洞，画给了我们看。',
         choices: [{ id: 'c1', text: '（回头看她）', nextNodeId: 'sis' }],
       },
       'sis': {
         id: 'sis',
         speakerName: '室友姐',
-        text: '嗯。留了门，还画好了路。这个世界从头到尾，都在等我们走到这里。（门缝里的光，一半是像素的，一半是多边形的）——回原来的家，还是留下来把这个没画完的世界看完。你来选，这次我听你的。',
+        text: '嗯。一个连橡皮印都要留三层的人，不会"不小心"漏一道缝。（裂缝的光落在她脸上，一半像素，一半多边形）是陷阱，还是出口，跳之前没人知道。但留在画里，就永远只能照着别人的剧本走。……跳不跳，你说了算。',
         choices: [
-          { id: 'c2a', text: '回家吧。回我们原来的家。', nextNodeId: 'home' },
-          { id: 'c2b', text: '再走走吧。没画完的部分，说不定就等着我们去看。', nextNodeId: 'stay' },
-          { id: 'c2s', text: '【直球】选哪边都行。我要选的从来不是世界，是牵着谁的手进门。', affectionDelta: { charId: 'novus', amount: 50 }, nextNodeId: 'special', requiresClear: true },
+          { id: 'c2a', text: '跳！别人的剧本，翻篇了！', nextNodeId: 'home' },
+          { id: 'c2b', text: '（深吸一口气，先握住她的手）……一起，就敢。', affectionDelta: { charId: 'novus', amount: 15 }, nextNodeId: 'stay' },
+          { id: 'c2s', text: '【直球】跳到哪里都行。我要选的从来不是世界，是牵着谁的手往下跳。', affectionDelta: { charId: 'novus', amount: 50 }, nextNodeId: 'special', requiresClear: true },
         ],
         backgroundStyle: 'MANGA',
       },
       'home': {
         id: 'home',
         speakerName: '室友姐',
-        text: '好。那把地图带上——万一以后想回来看看，这个世界画完了没有。（伸出手）……走了，回家。',
-        choices: [{ id: 'e', text: '（握住她的手）嗯。要回来看结局的！', affectionDelta: { charId: 'novus', amount: 15 }, nextNodeId: 'end' }],
+        text: '好。（她笑了，把拼好的地图折起来塞进你口袋）纪念品带上。数到三——不许闭眼，替我看清楚缝那边是什么。',
+        choices: [{ id: 'e', text: '一、二——三！！（两个人同时跳进光里）', affectionDelta: { charId: 'novus', amount: 15 }, nextNodeId: 'end' }],
       },
       'stay': {
         id: 'stay',
         speakerName: '室友姐',
-        text: '行啊。那接下来的路，换我跟着你走。（她把手递过来）队长，请带路。去看看没画完的地方长什么样。',
-        choices: [{ id: 'e', text: '（第一次走在她前面，手心全是汗）包在我身上！', affectionDelta: { charId: 'novus', amount: 15 }, nextNodeId: 'end' }],
+        text: '（反手扣紧你的手指）那就别松手。不管那边是新的世界，还是作者的书桌。……一、二——',
+        choices: [{ id: 'e', text: '三！！（光把两个人一起吞了进去）', affectionDelta: { charId: 'novus', amount: 15 }, nextNodeId: 'end' }],
       },
       'special': {
         id: 'special',
         speakerName: '室友姐',
-        text: '（门前的光落在她脸上。她安静地看了你很久，然后主动握住了你的手，十指相扣。）……那就别松手。哪个次元都别松。',
+        text: '（她安静地看了你很久，然后主动十指相扣，牵着你朝裂缝迈了半步。）……那闭着眼跳也没关系。方向，我来看。',
         choices: [{ id: 'e', text: '（用力回握）嗯！！', nextNodeId: 'end' }],
       },
       'end': {
         id: 'end',
         speakerName: '李豆沙',
-        text: '（拼好的地图最边上，作者新添了一笔还带着铅灰的画：一扇门，和两个牵着手的小人。——后编·完）',
-        choices: [{ id: 'e2', text: '～Fin～', nextNodeId: null }],
+        text: '（坠落只持续了一瞬。光的尽头，是谁也没见过的、全新的世界——不过，那就是下一个故事了。而在谁也看不见的地方，有人轻轻放下了笔，在那道"漏洞"的旁边，画上了一个小小的对勾。——后编·完）',
+        choices: [{ id: 'e2', text: '～未完待续～', nextNodeId: null }],
       },
     },
   },

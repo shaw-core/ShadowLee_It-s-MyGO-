@@ -460,3 +460,179 @@ const buildNovus = (): CharacterRig => {
 
   return { group, body, head, legL, legR, armL, armR };
 };
+
+
+// ============ 魔法熊猫（彩蛋变身：巫女帽 · 蓝星脸颊 · 骑扫帚飞行） ============
+export const buildPandaWitch = (): CharacterRig => {
+  const group = new THREE.Group();
+  const body = new THREE.Group();
+  group.add(body);
+
+  // 扫帚（横在身下，朝向 +z 前方）
+  const broom = new THREE.Group();
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 1.5, 6), mat(0x6b4a32));
+  shaft.rotation.x = Math.PI / 2;
+  shaft.castShadow = true;
+  const bristles = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.5, 7), mat(0xd7b06e));
+  bristles.rotation.x = Math.PI / 2;
+  bristles.position.z = -0.9;
+  bristles.castShadow = true;
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.08, 6), mat(0xf3d268));
+  band.rotation.x = Math.PI / 2;
+  band.position.z = -0.66;
+  broom.add(shaft, bristles, band);
+  broom.position.y = 0.28;
+  body.add(broom);
+
+  // 熊猫身体：白绒圆身 + 黑手脚
+  const torso = box(0.42, 0.36, 0.36, COL.white);
+  torso.position.y = 0.52;
+  const belly = box(0.3, 0.24, 0.05, 0xfffaf2);
+  belly.position.set(0, 0.5, 0.19);
+  body.add(torso, belly);
+
+  const makeLeg = (x: number) => {
+    const leg = new THREE.Group();
+    leg.position.set(x, 0.42, 0.08);
+    const paw = box(0.13, 0.2, 0.14, COL.black);
+    paw.position.y = -0.1;
+    paw.rotation.x = 0.5; // 跨坐在扫帚上
+    leg.add(paw);
+    return leg;
+  };
+  const legL = makeLeg(-0.17);
+  const legR = makeLeg(0.17);
+  body.add(legL, legR);
+
+  const makeArm = (x: number) => {
+    const arm = new THREE.Group();
+    arm.position.set(x, 0.62, 0);
+    const paw = box(0.12, 0.24, 0.13, COL.black);
+    paw.position.y = -0.1;
+    arm.add(paw);
+    return arm;
+  };
+  const armL = makeArm(-0.26);
+  const armR = makeArm(0.26);
+  // 双手向前扶着扫帚
+  armL.rotation.x = -1.1; armR.rotation.x = -1.1;
+  body.add(armL, armR);
+
+  // 藏青色领结围巾
+  const scarf = box(0.34, 0.1, 0.3, 0x2b3164);
+  scarf.position.y = 0.7;
+  const knot = box(0.12, 0.12, 0.08, 0x2b3164);
+  knot.position.set(0, 0.64, 0.18);
+  body.add(scarf, knot);
+
+  // 头：白绒大脑袋 + 黑耳 + 黑眼斑 + 蓝星脸颊
+  const head = new THREE.Group();
+  head.position.y = 0.92;
+  body.add(head);
+  const skull = box(0.5, 0.42, 0.44, COL.white);
+  head.add(skull);
+  const mkEar = (x: number) => { const e2 = ball(0.11, COL.black); e2.position.set(x, 0.22, -0.04); head.add(e2); };
+  mkEar(-0.22); mkEar(0.22);
+  const mkPatch = (x: number) => {
+    const patch = box(0.15, 0.16, 0.02, 0x2a2d33);
+    patch.position.set(x, 0.03, 0.22);
+    const eye = box(0.07, 0.08, 0.022, 0x3556c9);
+    eye.position.set(x, 0.03, 0.23);
+    head.add(patch, eye);
+  };
+  mkPatch(-0.12); mkPatch(0.12);
+  const nose = box(0.05, 0.04, 0.02, COL.black);
+  nose.position.set(0, -0.07, 0.23);
+  head.add(nose);
+  // 右脸蓝色星星（面向镜头时在观众右侧）
+  const star = new THREE.Mesh(new THREE.CircleGeometry(0.055, 5), new THREE.MeshBasicMaterial({ color: 0x8db8f5, side: THREE.DoubleSide }));
+  star.position.set(0.19, -0.06, 0.226);
+  head.add(star);
+
+  // 巫女帽：藏青锥帽（微歪）+ 帽檐 + 星星
+  const hat = new THREE.Group();
+  const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.46, 0.05, 8), mat(0x2b3164));
+  const coneH = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.5, 7), mat(0x2b3164));
+  coneH.position.y = 0.26;
+  coneH.rotation.z = -0.22;
+  coneH.position.x = 0.06;
+  brim.castShadow = true; coneH.castShadow = true;
+  const hatStar = new THREE.Mesh(new THREE.CircleGeometry(0.08, 5), new THREE.MeshBasicMaterial({ color: 0xf6d76b, side: THREE.DoubleSide }));
+  hatStar.position.set(0.18, 0.48, 0.02);
+  hat.add(brim, coneH, hatStar);
+  hat.position.y = 0.24;
+  hat.rotation.z = 0.1;
+  head.add(hat);
+
+  return { group, body, head, legL, legR, armL, armR };
+};
+
+// ============ 存档点小熊猫（坐姿，右脸蓝星；激活后围巾变粉、头顶亮星） ============
+export const buildCheckpointPanda = (): { group: THREE.Group; setActivated: () => void } => {
+  const group = new THREE.Group();
+  const s = 0.62; // 比主角小一圈
+  const inner = new THREE.Group();
+  inner.scale.set(s, s, s);
+  group.add(inner);
+
+  const torso = box(0.46, 0.4, 0.4, COL.white);
+  torso.position.y = 0.34;
+  const belly = box(0.32, 0.26, 0.05, 0xfffaf2);
+  belly.position.set(0, 0.32, 0.21);
+  inner.add(torso, belly);
+  // 坐姿短腿（前伸）
+  const mkLeg = (x: number) => {
+    const leg = box(0.14, 0.13, 0.3, COL.black);
+    leg.position.set(x, 0.1, 0.2);
+    inner.add(leg);
+  };
+  mkLeg(-0.15); mkLeg(0.15);
+  const mkArm = (x: number) => {
+    const arm = box(0.12, 0.26, 0.13, COL.black);
+    arm.position.set(x, 0.34, 0.02);
+    inner.add(arm);
+  };
+  mkArm(-0.27); mkArm(0.27);
+
+  const head = new THREE.Group();
+  head.position.y = 0.74;
+  inner.add(head);
+  const skull = box(0.52, 0.44, 0.46, COL.white);
+  head.add(skull);
+  const mkEar = (x: number) => { const e2 = ball(0.11, COL.black); e2.position.set(x, 0.24, -0.04); head.add(e2); };
+  mkEar(-0.22); mkEar(0.22);
+  const mkPatch = (x: number) => {
+    const patch = box(0.15, 0.17, 0.02, 0x2a2d33);
+    patch.position.set(x, 0.03, 0.23);
+    const eye = box(0.07, 0.085, 0.022, 0x3556c9);
+    eye.position.set(x, 0.03, 0.24);
+    head.add(patch, eye);
+  };
+  mkPatch(-0.12); mkPatch(0.12);
+  const nose = box(0.05, 0.04, 0.02, COL.black);
+  nose.position.set(0, -0.08, 0.24);
+  head.add(nose);
+  // 右脸蓝星
+  const star = new THREE.Mesh(new THREE.CircleGeometry(0.06, 5), new THREE.MeshBasicMaterial({ color: 0x8db8f5, side: THREE.DoubleSide }));
+  star.position.set(0.2, -0.07, 0.236);
+  head.add(star);
+
+  // 围巾（未激活灰蓝 → 激活粉）
+  const scarfMat = mat(0x93a6c4);
+  const scarf = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.1, 0.34), scarfMat);
+  scarf.position.y = 0.56;
+  inner.add(scarf);
+  // 头顶星（激活后出现）
+  const topStar = new THREE.Mesh(new THREE.OctahedronGeometry(0.09), new THREE.MeshStandardMaterial({ color: 0xf9a8d4, emissive: 0xdb2777, emissiveIntensity: 0.7, flatShading: true }));
+  topStar.position.y = 1.18;
+  topStar.visible = false;
+  inner.add(topStar);
+
+  return {
+    group,
+    setActivated: () => {
+      scarfMat.color.setHex(0xf472b6);
+      topStar.visible = true;
+    },
+  };
+};
