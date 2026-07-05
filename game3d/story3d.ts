@@ -17,7 +17,7 @@ export const EVENTS3D: Record<string, YuriEvent> = {
       'start': {
         id: 'start',
         speakerName: '李豆沙',
-        text: '（推开最后那扇门——刺眼的白光过后）……姐？姐！你看我的手！怎么全是一块一块的多边形？！',
+        text: '（推开最后那扇门——刺眼的白光过后）……小室？小室！你看我的手！怎么全是一块一块的多边形？！',
         choices: [{ id: 'c1', text: '（低头看自己）', nextNodeId: 'sis1' }],
       },
       'sis1': {
@@ -44,7 +44,7 @@ export const EVENTS3D: Record<string, YuriEvent> = {
       'dizzy': {
         id: 'dizzy',
         speakerName: '李豆沙',
-        text: '（走了两步，突然扶住额头）等、等一下……天旋地转的……姐，我好像，晕3D。',
+        text: '（走了两步，突然扶住额头）等、等一下……天旋地转的……小室，我好像，晕3D。',
         choices: [{ id: 'cd', text: '（蹲下缓一缓）', nextNodeId: 'candy' }],
       },
       'candy': {
@@ -129,7 +129,7 @@ export const EVENTS3D: Record<string, YuriEvent> = {
       'start': {
         id: 'start',
         speakerName: '李豆沙',
-        text: '姐，我刚才掉下去的时候看清楚了——云的下面什么都没有。不是黑的，是……淡淡的格子，像还没铺颜料的画布。',
+        text: '小室，我刚才掉下去的时候看清楚了——云的下面什么都没有。不是黑的，是……淡淡的格子，像还没铺颜料的画布。',
         choices: [{ id: 'c1', text: '（心有余悸地比划）', nextNodeId: 'sis' }],
       },
       'sis': {
@@ -172,7 +172,7 @@ export const EVENTS3D: Record<string, YuriEvent> = {
       'start': {
         id: 'start',
         speakerName: '李豆沙',
-        text: '姐，我确定了。按 Q 切过去的那个黑白世界，不是"漫画次元"——是这个世界的线稿层。刚才在塔里，我看到墙上有改过的痕迹，一条线被擦掉又重画了三次。',
+        text: '小室，我确定了。按 Q 切过去的那个黑白世界，不是"漫画次元"——是这个世界的线稿层。刚才在塔里，我看到墙上有改过的痕迹，一条线被擦掉又重画了三次。',
         choices: [{ id: 'c1', text: '（指给她看塔壁上的笔触）', nextNodeId: 'sis' }],
       },
       'sis': {
@@ -276,7 +276,7 @@ export const EVENTS3D: Record<string, YuriEvent> = {
       'start': {
         id: 'start',
         speakerName: '李豆沙',
-        text: '（世界的接缝处。把一路捡到的草稿页拼在一起——正好是这个世界的完整地图，而地图的最后一角，画着一扇门，就是眼前这扇。）……姐，作者把门，留在了给我们的图纸上。',
+        text: '（世界的接缝处。把一路捡到的草稿页拼在一起——正好是这个世界的完整地图，而地图的最后一角，画着一扇门，就是眼前这扇。）……小室，作者把门，留在了给我们的图纸上。',
         choices: [{ id: 'c1', text: '（回头看她）', nextNodeId: 'sis' }],
       },
       'sis': {

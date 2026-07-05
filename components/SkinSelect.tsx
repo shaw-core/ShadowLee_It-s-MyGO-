@@ -129,7 +129,7 @@ const SkinSelect: React.FC<SkinSelectProps> = ({ currentSkin, novusUnlocked, onC
               className={`w-10 h-10 border-4 font-bold ${
                 i === index ? 'bg-pink-500 border-pink-700 text-white' : 'bg-white border-blue-200 text-blue-400 hover:border-blue-400'
               }`}>
-              {lockedCell ? '🔒' : sm.id === 'skinNovus' ? '姐' : i + 1}
+              {lockedCell ? '🔒' : sm.id === 'skinNovus' ? '室' : i + 1}
             </button>
           );
         })}

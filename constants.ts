@@ -230,7 +230,7 @@ export const EVENTS: Record<string, YuriEvent> = {
         id: 'deny',
         speakerName: '室友姐',
         text: "是吗？那我下次就算听见了，也当作没听见好了。",
-        choices: [{ id: 'end', text: "别！姐！我错了！", nextNodeId: 'end_part' }]
+        choices: [{ id: 'end', text: "别！小室！我错了！", nextNodeId: 'end_part' }]
       },
       'special_reaction_1': {
         id: 'special_reaction_1',

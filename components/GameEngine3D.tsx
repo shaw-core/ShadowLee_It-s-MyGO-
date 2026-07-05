@@ -938,7 +938,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
                 <BookOpen size={18} />
                 <span>{pageCount}</span>
              </div>
-             <div className="px-3 py-2 bg-white border-4 border-blue-500 retro-border text-emerald-500 flex items-center gap-2 shadow-lg" title="姐姐牌薄荷糖：清除眩晕">
+             <div className="px-3 py-2 bg-white border-4 border-blue-500 retro-border text-emerald-500 flex items-center gap-2 shadow-lg" title="小室牌薄荷糖：清除眩晕">
                 <Candy size={18} />
                 <span>{shardCount}</span>
              </div>
