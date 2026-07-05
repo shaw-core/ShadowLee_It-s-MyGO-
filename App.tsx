@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GameState, AffectionState, YuriEvent, LevelResult, EntityType } from './types';
 import { EVENTS, LEVELS, BGM_URL, TOTAL_COLLECTIBLES_COUNT } from './constants';
-import GameEngine from './components/GameEngine';
+import GameEngine from './components/GameEngine3D';
 import DialogueSystem from './components/DialogueSystem';
 import MainMenu from './components/MainMenu';
 import Gallery from './components/Gallery';
