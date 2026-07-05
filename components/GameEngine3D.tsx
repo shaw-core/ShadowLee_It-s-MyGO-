@@ -563,7 +563,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
 
       // 相机相对方向的输入
       const fx = -Math.sin(s.cam.yaw), fz = -Math.cos(s.cam.yaw);   // 前
-      const rx = fz, rz = -fx;                                       // 右
+      const rx = -fz, rz = fx;                                       // 右 = forward × up
       let ix = 0, iz = 0;
       if (s.keys.f) { ix += fx; iz += fz; }
       if (s.keys.b) { ix -= fx; iz -= fz; }
