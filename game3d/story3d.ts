@@ -51,9 +51,9 @@ export const EVENTS3D: Record<string, YuriEvent> = {
   },
 
   // ---------- 第1关后：新的身体 ----------
-  'event_level1': {
-    id: 'event_level1',
-    requiredPageId: 'page_ch1',
+  'event3d_level1': {
+    id: 'event3d_level1',
+    requiredPageId: 'page3d_ch1',
     startNodeId: 'start',
     nodes: {
       'start': {
@@ -101,9 +101,9 @@ export const EVENTS3D: Record<string, YuriEvent> = {
   },
 
   // ---------- 第2关后：坠落与接住 ----------
-  'event_level2': {
-    id: 'event_level2',
-    requiredPageId: 'page_ch2',
+  'event3d_level2': {
+    id: 'event3d_level2',
+    requiredPageId: 'page3d_ch2',
     startNodeId: 'start',
     nodes: {
       'start': {
@@ -144,9 +144,9 @@ export const EVENTS3D: Record<string, YuriEvent> = {
   },
 
   // ---------- 第3关后：黑白的次元 ----------
-  'event_level3': {
-    id: 'event_level3',
-    requiredPageId: 'page_ch3',
+  'event3d_level3': {
+    id: 'event3d_level3',
+    requiredPageId: 'page3d_ch3',
     startNodeId: 'start',
     nodes: {
       'start': {
@@ -196,9 +196,9 @@ export const EVENTS3D: Record<string, YuriEvent> = {
   },
 
   // ---------- 第4关后：云上的休息 ----------
-  'event_level4': {
-    id: 'event_level4',
-    requiredPageId: 'page_ch4',
+  'event3d_level4': {
+    id: 'event3d_level4',
+    requiredPageId: 'page3d_ch4',
     startNodeId: 'start',
     nodes: {
       'start': {
@@ -248,9 +248,9 @@ export const EVENTS3D: Record<string, YuriEvent> = {
   },
 
   // ---------- 第5关后：终章·接缝之门 ----------
-  'event_level5': {
-    id: 'event_level5',
-    requiredPageId: 'page_ch5',
+  'event3d_level5': {
+    id: 'event3d_level5',
+    requiredPageId: 'page3d_ch5',
     startNodeId: 'start',
     nodes: {
       'start': {

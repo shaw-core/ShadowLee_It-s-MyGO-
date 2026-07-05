@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { GameState, AffectionState, YuriEvent, LevelResult } from './types';
-import { BGM_URL } from './constants';
-import { LEVELS3D, TOTAL_COLLECTIBLES_COUNT } from './game3d/levels3d';
+import { GameState, AffectionState, YuriEvent, LevelResult, EntityType } from './types';
+import { EVENTS, LEVELS, BGM_URL, TOTAL_COLLECTIBLES_COUNT as TOTAL_2D } from './constants';
+import { LEVELS3D, TOTAL_COLLECTIBLES_COUNT as TOTAL_3D } from './game3d/levels3d';
 import { EVENTS3D } from './game3d/story3d';
 import { SkinId } from './game3d/characters3d';
+import GameEngine from './components/GameEngine';
 import GameEngine3D from './components/GameEngine3D';
 import DialogueSystem from './components/DialogueSystem';
 import MainMenu from './components/MainMenu';
@@ -12,6 +13,7 @@ import Gallery from './components/Gallery';
 import ResultScreen from './components/ResultScreen';
 import SecretEnding from './components/SecretEnding';
 
+type GameMode = '2d' | '3d';
 // 对话结束后要去哪
 type AfterDialogue = 'ENTER_LEVEL' | 'ADVANCE' | 'GALLERY';
 
@@ -27,12 +29,14 @@ const loadSkin = (): SkinId => {
 const App: React.FC = () => {
   const [gameState, setGameState] = useState<GameState>(GameState.MENU);
 
-  // 游戏进度
+  // 模式与进度
+  const [mode, setMode] = useState<GameMode>('2d');
   const [currentLevelIndex, setCurrentLevelIndex] = useState(0);
   const [inventory, setInventory] = useState<Set<string>>(new Set());
-  const [isGameCleared, setIsGameCleared] = useState(false);
+  const [cleared2D, setCleared2D] = useState(false);
+  const [cleared3D, setCleared3D] = useState(false);
 
-  // 外观
+  // 外观（仅 3D 使用）
   const [skin, setSkin] = useState<SkinId>(loadSkin);
 
   // 瞬时状态
@@ -40,7 +44,7 @@ const App: React.FC = () => {
   const [activeEvent, setActiveEvent] = useState<YuriEvent | null>(null);
   const afterDialogueRef = useRef<AfterDialogue>('ADVANCE');
 
-  // 好感度
+  // 好感度（两篇共用同一套羁绊）
   const [affection, setAffection] = useState<AffectionState[]>([
     { characterId: 'novus', name: '室友姐', value: 20, color: '#ec4899' },
   ]);
@@ -63,12 +67,26 @@ const App: React.FC = () => {
     }
   };
 
-  // ---- 主流程 ----
-  const handleStartGame = () => {
+  // 当前模式对应的通关标记（决定引擎跳关按钮和直球选项）
+  const clearedForMode = mode === '2d' ? cleared2D : cleared3D;
+  // 当前对话事件属于哪一篇（图鉴回放时事件与 mode 可能无关）
+  const eventCleared = activeEvent
+    ? (activeEvent.id.startsWith('event3d') || activeEvent.id === 'event_prologue' ? cleared3D : cleared2D)
+    : clearedForMode;
+
+  // ---- 入口 ----
+  const handleStart2D = () => {
     tryPlayMusic();
+    setMode('2d');
     setCurrentLevelIndex(0);
-    setInventory(new Set());
-    // 后编开场：先播序章对话，再进第1关
+    setGameState(GameState.PLAYING);
+  };
+
+  const handleStart3D = () => {
+    tryPlayMusic();
+    setMode('3d');
+    setCurrentLevelIndex(0);
+    // 后编开场：先播序章对话（推门后世界变成 3D），再进第1关
     afterDialogueRef.current = 'ENTER_LEVEL';
     setActiveEvent(EVENTS3D['event_prologue']);
     setGameState(GameState.DIALOGUE);
@@ -93,16 +111,21 @@ const App: React.FC = () => {
     setGameState(GameState.SECRET_ENDING);
   };
 
-  // 标题连点 5 次：测试用全解锁
+  // 标题连点 5 次：测试用全解锁（两篇一起）
   const handleCheatUnlock = () => {
-    setIsGameCleared(true);
+    setCleared2D(true);
+    setCleared3D(true);
     const all = new Set<string>();
+    LEVELS.forEach(level => level.entities.forEach(ent => {
+      if (ent.type === EntityType.COLLECTIBLE_PAGE || ent.type === EntityType.COLLECTIBLE_SHARD) all.add(ent.id);
+    }));
     LEVELS3D.forEach(lv => lv.entities.forEach(e => {
       if (e.type === 'PAGE' || e.type === 'SHARD') all.add(e.id);
     }));
     setInventory(all);
   };
 
+  // ---- 通用流程 ----
   const handleLevelFinish = (result: LevelResult) => {
     setLastResult(result);
     const inv = new Set(inventory);
@@ -113,15 +136,26 @@ const App: React.FC = () => {
 
   const handleResultContinue = () => {
     if (lastResult) {
-      const level = LEVELS3D[currentLevelIndex];
-      const event = EVENTS3D[`event_level${level.id}`];
-      const isFinal = currentLevelIndex === LEVELS3D.length - 1;
-      // 终章必看剧情；其余关需要拿到对应漫画页
-      if (event && (isFinal || inventory.has(event.requiredPageId) || lastResult.collectedIds.includes(event.requiredPageId))) {
-        afterDialogueRef.current = 'ADVANCE';
-        setActiveEvent(event);
-        setGameState(GameState.DIALOGUE);
-        return;
+      if (mode === '2d') {
+        const level = LEVELS[currentLevelIndex];
+        const event = EVENTS[`event_level${level.id}`];
+        const isLevel6 = level.id === 6;
+        if (event && (isLevel6 || inventory.has(event.requiredPageId))) {
+          afterDialogueRef.current = 'ADVANCE';
+          setActiveEvent(event);
+          setGameState(GameState.DIALOGUE);
+          return;
+        }
+      } else {
+        const level = LEVELS3D[currentLevelIndex];
+        const event = EVENTS3D[`event3d_level${level.id}`];
+        const isFinal = currentLevelIndex === LEVELS3D.length - 1;
+        if (event && (isFinal || inventory.has(event.requiredPageId) || lastResult.collectedIds.includes(event.requiredPageId))) {
+          afterDialogueRef.current = 'ADVANCE';
+          setActiveEvent(event);
+          setGameState(GameState.DIALOGUE);
+          return;
+        }
       }
     }
     advanceLevel();
@@ -149,18 +183,20 @@ const App: React.FC = () => {
   };
 
   const advanceLevel = () => {
+    const total = mode === '2d' ? LEVELS.length : LEVELS3D.length;
     const next = currentLevelIndex + 1;
-    if (next < LEVELS3D.length) {
+    if (next < total) {
       setCurrentLevelIndex(next);
       setGameState(GameState.PLAYING);
     } else {
-      setIsGameCleared(true);
+      if (mode === '2d') setCleared2D(true);
+      else setCleared3D(true);
       setGameState(GameState.MENU);
     }
   };
 
   const handleGalleryReplay = (eventId: string) => {
-    const event = EVENTS3D[eventId];
+    const event = EVENTS[eventId] ?? EVENTS3D[eventId];
     if (event) {
       afterDialogueRef.current = 'GALLERY';
       setActiveEvent(event);
@@ -168,17 +204,19 @@ const App: React.FC = () => {
     }
   };
 
-  const isFullCompletion = inventory.size >= TOTAL_COLLECTIBLES_COUNT;
+  const isFullCompletion = inventory.size >= TOTAL_2D + TOTAL_3D;
 
   return (
     <div className="w-full min-h-screen bg-zinc-950">
       {gameState === GameState.MENU && (
         <MainMenu
-          onStart={handleStartGame}
+          onStart2D={handleStart2D}
+          onStart3D={handleStart3D}
           onGallery={handleGalleryOpen}
           onSkinSelect={handleSkinSelectOpen}
           onSecretEnding={handleSecretEnding}
-          isGameCleared={isGameCleared}
+          isGameCleared={cleared2D}
+          is3DCleared={cleared3D}
           isFullCompletion={isFullCompletion}
           onCheatUnlock={handleCheatUnlock}
         />
@@ -192,13 +230,22 @@ const App: React.FC = () => {
         />
       )}
 
-      {gameState === GameState.PLAYING && (
+      {gameState === GameState.PLAYING && mode === '2d' && (
+        <GameEngine
+          levelConfig={LEVELS[currentLevelIndex]}
+          onFinishLevel={handleLevelFinish}
+          onExit={() => setGameState(GameState.MENU)}
+          isGameCleared={cleared2D}
+        />
+      )}
+
+      {gameState === GameState.PLAYING && mode === '3d' && (
         <GameEngine3D
           levelConfig={LEVELS3D[currentLevelIndex]}
           skin={skin}
           onFinishLevel={handleLevelFinish}
           onExit={() => setGameState(GameState.MENU)}
-          isGameCleared={isGameCleared}
+          isGameCleared={cleared3D}
         />
       )}
 
@@ -210,7 +257,7 @@ const App: React.FC = () => {
         <DialogueSystem
           event={activeEvent}
           onEventComplete={handleDialogueComplete}
-          isGameCleared={isGameCleared}
+          isGameCleared={eventCleared}
         />
       )}
 

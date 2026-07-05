@@ -3,16 +3,18 @@ import { Play, BookHeart, Star, X, ImageOff, Sparkles, Shirt } from 'lucide-reac
 import { SPECIAL_CG_URL } from '../constants';
 
 interface MainMenuProps {
-  onStart: () => void;
+  onStart2D: () => void;
+  onStart3D: () => void;
   onGallery: () => void;
   onSkinSelect?: () => void;
   onSecretEnding?: () => void;
-  isGameCleared: boolean;
+  isGameCleared: boolean;      // 前编（2D）通关
+  is3DCleared?: boolean;       // 后编（3D）通关
   isFullCompletion?: boolean;
   onCheatUnlock?: () => void; // New cheat prop
 }
 
-const MainMenu: React.FC<MainMenuProps> = ({ onStart, onGallery, onSkinSelect, onSecretEnding, isGameCleared, isFullCompletion, onCheatUnlock }) => {
+const MainMenu: React.FC<MainMenuProps> = ({ onStart2D, onStart3D, onGallery, onSkinSelect, onSecretEnding, isGameCleared, is3DCleared, isFullCompletion, onCheatUnlock }) => {
   const [showCG, setShowCG] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [clickCount, setClickCount] = useState(0);
@@ -49,10 +51,25 @@ const MainMenu: React.FC<MainMenuProps> = ({ onStart, onGallery, onSkinSelect, o
 
         <div className="flex flex-col gap-6 w-64 mx-auto pt-12">
           <button 
-            onClick={onStart}
+            onClick={onStart2D}
             className="group flex items-center justify-center px-6 py-4 bg-blue-500 text-white font-bold text-xl border-4 border-blue-700 hover:bg-blue-400 hover:border-blue-500 transition-none retro-border shadow-[4px_4px_0_0_#1e3a8a] hover:translate-y-1 hover:shadow-none"
           >
-            <Play className="mr-2 group-hover:fill-current" /> {isGameCleared ? '二周目开始' : '开始游戏'}
+            <Play className="mr-2 group-hover:fill-current" />
+            <span className="flex flex-col items-start leading-tight">
+              <span>前编 · 像素篇{isGameCleared ? ' ★' : ''}</span>
+              <span className="text-xs font-normal opacity-80">经典 2D {isGameCleared ? '(二周目)' : ''}</span>
+            </span>
+          </button>
+
+          <button 
+            onClick={onStart3D}
+            className="group flex items-center justify-center px-6 py-4 bg-pink-500 text-white font-bold text-xl border-4 border-pink-700 hover:bg-pink-400 hover:border-pink-500 transition-none retro-border shadow-[4px_4px_0_0_#9d174d] hover:translate-y-1 hover:shadow-none"
+          >
+            <Sparkles className="mr-2" />
+            <span className="flex flex-col items-start leading-tight">
+              <span>后编 · 多边形篇{is3DCleared ? ' ★' : ''}</span>
+              <span className="text-xs font-normal opacity-80">全新 3D {is3DCleared ? '(二周目)' : ''}</span>
+            </span>
           </button>
           
           <button 
