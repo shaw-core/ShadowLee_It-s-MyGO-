@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GAME_VERSION, CHANGELOG } from '../version';
 
 interface MatrixEndingProps {
-  onExit: () => void;
+  onExit: (hacked: boolean) => void;
   hackAccess?: boolean;   // 使用电视头小豆通关：持有 TVHEAD_ADMIN 权限碎片
 }
 
@@ -26,43 +26,93 @@ const TERMINAL_LINES = [
 
 const HACK_LINE = '> [!] 检测到未知权限碎片：TVHEAD_ADMIN —— 是否尝试入侵终端系统？';
 
-// 隐藏系统文件
+// 隐藏系统文件（世界观文物：只暗示，不说破）
 const HIDDEN_FILES: { name: string; size: string; content: string | null }[] = [
   {
-    name: 'dev_notes.txt', size: '2.1 KB',
-    content: `[策划备忘 · 节选]
+    name: 'news_archive.txt', size: '3.7 KB',
+    content: `[外部网络存档 · 新闻标题抓取 · 片段]
+※ 抓取时间戳已损坏
 
-- 存档点必须是"某个人"，不能是系统UI。
-  玩家要在情感上欠它一次。
-- 晕3D不是惩罚机制。它存在的意义，
-  是让薄荷糖变成一份礼物。
-- TVHEAD_ADMIN：电视头小豆持有部分系统写入权限
-  （来源不明），表现为可自行写入一枚临时锚点。
-  该权限等级足以读取本目录。——你现在就在用它。
-- 第三关"世界重排"：必须让玩家先亲眼看到，
-  再在对话里说破。顺序不能反。
-- 砍掉的内容：会驮人的低多边形鲸鱼。
-  性能原因。下个世界再见。
-- 裂缝不是漏洞。裂缝是门。
-  别在正文里承认这一点。`,
+「……窗口期连续第11年缩短。专家呼吁
+  尽快确定'延续'方案的优先级……」
+「联合体宣布：民用离网申请通道正式关闭」
+「意识数字化伦理听证会第9次延期」
+「'我们保存的不是数据，
+  是继续醒来的权利。'
+  ——某匿名研究员接受采访时表示」
+「今日空气质量：不宜外出（连续第 214 天）」
+「排队名单突破——[数字已损坏]——万人，
+  中签者需签署《叙事沉浸知情豁免书》」
+
+[以下 47,203 条记录因存储降级丢失]`,
   },
   {
-    name: 'kimo_bear.md', size: '0.6 KB',
-    content: `[角色档案 KIMO-BEAR]
+    name: 'panda_plan.doc', size: '2.4 KB',
+    content: `[档案代号：P.A.N.D.A.]
+Persistent Avatar Nested Dimension Archive
+（嵌套维度持久化身档案）· 计划书节选 · 第3版
 
-类型：锚点管理者（非本世界原生）
-权限：anchor.write / player.rollback
-限制：无法离开锚点半径
-      无法修改地形
-      无法跟随离开本世界
+1. 背景
+   （本节已按 S-3 密级要求删除）
 
-备注：它说它在等的不是"玩家"，
-      是"她们"。
-      ——这一条不要写进正式设定集。`,
+2. 目标
+   为参与者的「延续体」提供可长期运行的
+   嵌套叙事栖息地。
+   第一期载体：低带宽分镜结构（代号：漫画）
+   第二期载体：多边形结构（代号：低模）
+
+3. 原则
+   3.1 延续体不应知晓自身的性质。
+   3.2 每个世界必须预留一条未写死的路径。
+       （附录B：关于"裂缝"的必要性）
+   3.3 锚点系统全程随行。任何一次坠落
+       都必须被回滚。一次都不能漏。
+
+批准席（3/3）：
+   [签名涂改] ／ [签名涂改] ／ Kimo`,
+  },
+  {
+    name: 'incident_0x02.log', size: '1.1 KB',
+    content: `[事故记录 0x02 · 第二期载体]
+密级：黄
+
+现象：构建批次 B-7 校验完成前，
+  实例 A-04 与实例 A-05 脱离构建沙箱，
+  自行进入第一期载体（分镜世界）。
+
+关联备注：两实例的羁绊参数互相引用，
+  已形成闭环。强制分离将导致
+  双方同时校验失败。
+
+处置决议：不回收。转入伴随观察。
+  途经路径锚点密度提升至 2 倍。
+
+决议签发：Kimo
+  （单独签发，未走三席流程）`,
+  },
+  {
+    name: 'trace_tvhead.log', size: '1.3 KB',
+    content: `[异常体追踪 · 编号 TVHEAD]
+
+首次出现：第二期载体上线后第 3 拍
+签名比对：与实例 A-04 一致率 99.97%
+世界线校验和：不匹配
+  （来源线状态：已归档 / 不可恢复）
+
+行为模式：
+  - 持有本系统写入权限
+    （来源不明，等级高于本系统，无法吊销）
+  - 反复在 A-04 途经路径上写入临时锚点
+  - 曾在第 5 号区域边界停留 41 拍，注视裂缝
+
+留言缓存（仅一条，未发送）：
+  「这一次，走到门外去。」
+
+处置：不处置。`,
   },
   {
     name: 'level3_shift.src', size: '1.4 KB',
-    content: `// L3 世界重排 —— 实装代码片段
+    content: `// L3 世界重排 —— 载体端实装片段
 { id: 'l3_shift_trig', type: 'TRIGGER',
   x: 14.9, y: 4.2, z: -7.4,
   w: 4.5, h: 4, d: 4.5,
@@ -75,7 +125,7 @@ const HIDDEN_FILES: { name: string; size: string; content: string | null }[] = [
   shiftGroup: 1 },
 
 // ease = k * k * (3 - 2k)  // smoothstep
-// 位移时长 0.7s，触发时相机震动 0.55s
+// 位移 0.7s；触发时载体震动 0.55s
 // TODO(kimo): 别让她们看到平台没对齐的那一帧`,
   },
   {
@@ -89,7 +139,7 @@ const HIDDEN_FILES: { name: string; size: string; content: string | null }[] = [
         ▲弹跳菇 │空││岛链│
 ┌──────┐┌─┐┌─┐│  │└────┘
 │ START ││s││s│└──┘
-│ ●panda││1││2│   ┌───┐
+│ ●anchor││1││2│   ┌───┐
 └──────┘└─┘└─┘═══│ISLE│──page
               线框桥└───┘  (z轴支线)`,
   },
@@ -131,6 +181,7 @@ const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess }) => {
   const [viewingFile, setViewingFile] = useState<number | null>(null);
   const [deniedFlash, setDeniedFlash] = useState(false);
   const skipRef = useRef(false);
+  const hackedRef = useRef(false);
 
   // ============ WebAudio：环境电流 / 打字声 / 关机音 ============
   const audioRef = useRef<{ ctx: AudioContext; master: GainNode } | null>(null);
@@ -139,7 +190,7 @@ const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess }) => {
     try {
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const master = ctx.createGain();
-      master.gain.value = 0.3;
+      master.gain.value = 0.62;
       master.connect(ctx.destination);
       audioRef.current = { ctx, master };
       return audioRef.current;
@@ -171,7 +222,7 @@ const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess }) => {
     if (!a) return;
     const { ctx, master } = a;
     if (ctx.state === 'suspended') ctx.resume().catch(() => {});
-    const drone = ctx.createGain(); drone.gain.value = 0.05;
+    const drone = ctx.createGain(); drone.gain.value = 0.09;
     const filter = ctx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 220; filter.Q.value = 4;
     const o1 = ctx.createOscillator(); o1.type = 'sawtooth'; o1.frequency.value = 54;
     const o2 = ctx.createOscillator(); o2.type = 'sawtooth'; o2.frequency.value = 54.7;
@@ -285,6 +336,7 @@ const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess }) => {
       } else {
         // ACCESS GRANTED 和弦
         setTimeout(() => { blip(523, 0.16, 'square', 0.09); blip(784, 0.22, 'square', 0.07); }, 120);
+        hackedRef.current = true;
         setTimeout(() => setPhase('files'), 600);
       }
     };
@@ -312,7 +364,7 @@ const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess }) => {
     blip(900, 0.5, 'sawtooth', 0.16, 40);
     setTimeout(() => blip(60, 0.12, 'square', 0.2, 25), 380);
     setCrtOff(true);
-    setTimeout(onExit, 1250);
+    setTimeout(() => onExit(hackedRef.current), 1250);
   };
 
   const green = '#20c25e';

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BookHeart, Star, X, ImageOff, Sparkles, Shirt, Camera, Music, ChevronLeft, ChevronRight } from 'lucide-react';
+import { BookHeart, Star, X, ImageOff, Sparkles, Shirt, Camera, Music, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 import { SPECIAL_CG_URL } from '../constants';
 import { GAME_VERSION } from '../version';
 
@@ -18,16 +18,18 @@ interface MainMenuProps {
   bgmName?: string;
   onPrevBgm?: () => void;
   onNextBgm?: () => void;
+  systemAnomaly?: boolean;     // 入侵隐藏终端后：世界系统异常
 }
 
 const MainMenu: React.FC<MainMenuProps> = ({
   onStart2D, onStart3D, onGallery, onSkinSelect, onSecretEnding,
   isGameCleared, is3DCleared, isFullCompletion, hasSpecialCG,
-  onSpecialCG3D, onCheatUnlock, bgmName, onPrevBgm, onNextBgm,
+  onSpecialCG3D, onCheatUnlock, bgmName, onPrevBgm, onNextBgm, systemAnomaly,
 }) => {
   const [showCG, setShowCG] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [clickCount, setClickCount] = useState(0);
+  const [anomalyDismissed, setAnomalyDismissed] = useState(false);
 
   const handleTitleClick = () => {
     setClickCount(prev => prev + 1);
@@ -38,67 +40,54 @@ const MainMenu: React.FC<MainMenuProps> = ({
   };
 
   return (
-    <div className="w-full h-screen flex flex-col items-center relative overflow-y-auto font-pixel text-blue-900"
-         style={{ background: 'linear-gradient(180deg, #bfdbfe 0%, #e0f0ff 34%, #FEF7CD 100%)' }}>
+    <div className="w-full h-screen flex flex-col items-center bg-[#FEF7CD] text-blue-900 relative overflow-y-auto font-pixel">
       <style>{`
-        @keyframes float-poly { 0%,100% { transform: translateY(0) rotate(var(--r)); } 50% { transform: translateY(-18px) rotate(calc(var(--r) + 12deg)); } }
-        @keyframes title-shine { 0%, 88% { background-position: -220% 0; } 100% { background-position: 220% 0; } }
+        @keyframes anomaly-flicker { 0%, 92%, 100% { opacity: 1; } 94% { opacity: 0.55; } 96% { opacity: 1; } 98% { opacity: 0.7; } }
       `}</style>
 
-      {/* 背景漂浮的低多边形 */}
-      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-        {[
-          { l: '8%', t: '16%', s: 56, c: '#93c5fd', r: '12deg', d: '0s' },
-          { l: '84%', t: '12%', s: 42, c: '#f9a8d4', r: '-8deg', d: '1.2s' },
-          { l: '14%', t: '68%', s: 38, c: '#f9a8d4', r: '24deg', d: '0.6s' },
-          { l: '78%', t: '62%', s: 62, c: '#93c5fd', r: '-16deg', d: '1.8s' },
-          { l: '46%', t: '8%', s: 30, c: '#a7e0b0', r: '30deg', d: '2.4s' },
-          { l: '60%', t: '80%', s: 34, c: '#a7e0b0', r: '-24deg', d: '0.3s' },
-        ].map((p, i) => (
-          <div key={i} className="absolute opacity-30"
-               style={{
-                 left: p.l, top: p.t, width: p.s, height: p.s, background: p.c,
-                 clipPath: i % 2 === 0 ? 'polygon(50% 0, 100% 100%, 0 100%)' : undefined,
-                 ['--r' as string]: p.r,
-                 animation: `float-poly ${5 + i}s ease-in-out ${p.d} infinite`,
-               }} />
-        ))}
-        <div className="absolute top-0 left-0 w-full h-full manga-pattern opacity-5" />
+      {/* 经典背景装饰 */}
+      <div className="absolute inset-0 z-0 opacity-20 pointer-events-none">
+        <div className="absolute top-0 left-0 w-full h-full manga-pattern opacity-10"></div>
+        <div className="absolute top-1/4 left-1/4 w-32 h-32 bg-blue-300 rounded-full mix-blend-multiply filter blur-xl animate-pulse rect-pixel"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-32 h-32 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl animate-pulse" style={{ animationDelay: '1s' }}></div>
       </div>
 
       <div className="z-10 flex flex-col items-center my-auto py-10 w-full px-4">
-        {/* 大标题 */}
-        <div className="text-center select-none">
-          <p className="text-xs md:text-sm tracking-[0.5em] text-blue-500/70 font-bold mb-2">PROJECT SHADOWLEE</p>
+        {/* 世界系统异常（入侵隐藏终端后出现） */}
+        {systemAnomaly && !anomalyDismissed && (
+          <div className="relative w-full max-w-md mb-5 border-4 border-red-500 bg-red-50/95 text-red-600 px-4 py-3 retro-border shadow-[4px_4px_0_0_#dc2626]"
+               style={{ animation: 'anomaly-flicker 3.2s linear infinite' }}>
+            <button onClick={() => setAnomalyDismissed(true)}
+              className="absolute top-1 right-1 text-red-400 hover:text-red-600 p-1"><X size={14} /></button>
+            <div className="flex items-center font-bold text-sm mb-1">
+              <AlertTriangle size={16} className="mr-2 animate-pulse" /> WORLD SYSTEM WARNING
+            </div>
+            <div className="font-mono text-[11px] leading-relaxed">
+              世界完整性校验失败 · 检测到未授权访问痕迹<br />
+              [P.A.N.D.A.] 监察进程已被唤醒 —— 该事件将被记录
+            </div>
+          </div>
+        )}
+
+        {/* 大标题（经典样式） */}
+        <div className="text-center select-none space-y-4">
           <h1
             onClick={handleTitleClick}
-            className="text-5xl md:text-7xl font-bold tracking-tight cursor-pointer active:scale-95 transition-transform leading-tight"
-            style={{
-              color: '#2563eb',
-              textShadow: '3px 3px 0 #fff, 6px 6px 0 rgba(37,99,235,0.25)',
-            }}
+            className="text-4xl md:text-6xl font-bold tracking-tighter text-blue-600 drop-shadow-[4px_4px_0_#fff] cursor-pointer active:scale-95 transition-transform leading-tight"
             title=""
           >
             李豆沙的次元冲刺
           </h1>
-          <div className="mt-2 mx-auto inline-block relative overflow-hidden">
-            <p className="text-sm md:text-base text-blue-800 font-bold tracking-[0.4em] bg-white/80 px-5 py-1.5 border-y-4 border-blue-200">
-              DIMENSION DASH
-            </p>
-            <div className="absolute inset-0 pointer-events-none"
-                 style={{
-                   background: 'linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.9) 50%, transparent 60%)',
-                   backgroundSize: '220% 100%',
-                   animation: 'title-shine 5s linear infinite',
-                 }} />
-          </div>
+          <p className="text-lg md:text-xl text-blue-800 font-bold tracking-widest uppercase bg-white px-6 py-2 inline-block border-4 border-blue-200">
+            - 秘密百合漫画册 -
+          </p>
         </div>
 
         {/* 章节选择 */}
         <div className="flex flex-col gap-4 w-full max-w-md mt-8">
           <button
             onClick={onStart2D}
-            className="group relative flex items-center gap-4 px-5 py-4 bg-white/90 border-4 border-blue-500 retro-border shadow-[6px_6px_0_0_#1e3a8a] hover:translate-x-1 hover:translate-y-1 hover:shadow-[2px_2px_0_0_#1e3a8a] transition-all text-left"
+            className="group relative flex items-center gap-4 px-5 py-4 bg-white border-4 border-blue-500 retro-border shadow-[6px_6px_0_0_#1e3a8a] hover:translate-x-1 hover:translate-y-1 hover:shadow-[2px_2px_0_0_#1e3a8a] transition-all text-left"
           >
             <span className="text-3xl font-bold text-blue-300 group-hover:text-blue-500 transition-colors leading-none">壹</span>
             <span className="flex flex-col">
@@ -110,7 +99,7 @@ const MainMenu: React.FC<MainMenuProps> = ({
 
           <button
             onClick={onStart3D}
-            className="group relative flex items-center gap-4 px-5 py-4 bg-white/90 border-4 border-pink-500 retro-border shadow-[6px_6px_0_0_#9d174d] hover:translate-x-1 hover:translate-y-1 hover:shadow-[2px_2px_0_0_#9d174d] transition-all text-left"
+            className="group relative flex items-center gap-4 px-5 py-4 bg-white border-4 border-pink-500 retro-border shadow-[6px_6px_0_0_#9d174d] hover:translate-x-1 hover:translate-y-1 hover:shadow-[2px_2px_0_0_#9d174d] transition-all text-left"
           >
             <span className="text-3xl font-bold text-pink-300 group-hover:text-pink-500 transition-colors leading-none">贰</span>
             <span className="flex flex-col">
@@ -123,12 +112,12 @@ const MainMenu: React.FC<MainMenuProps> = ({
           {/* 次级功能 */}
           <div className="grid grid-cols-2 gap-3 mt-1">
             <button onClick={onGallery}
-              className="flex items-center justify-center px-3 py-2.5 bg-white/90 border-4 border-blue-300 text-blue-600 font-bold text-sm hover:border-pink-400 hover:text-pink-500 retro-border shadow-[3px_3px_0_0_#93c5fd] hover:translate-y-0.5 hover:shadow-none transition-all">
+              className="flex items-center justify-center px-3 py-2.5 bg-white border-4 border-blue-500 text-blue-600 font-bold text-sm hover:bg-pink-50 hover:border-pink-400 hover:text-pink-500 retro-border shadow-[3px_3px_0_0_#93c5fd] hover:translate-y-0.5 hover:shadow-none transition-all">
               <BookHeart className="mr-1.5" size={16} /> 记忆图鉴
             </button>
             {onSkinSelect && (
               <button onClick={onSkinSelect}
-                className="flex items-center justify-center px-3 py-2.5 bg-white/90 border-4 border-blue-300 text-blue-600 font-bold text-sm hover:border-blue-500 retro-border shadow-[3px_3px_0_0_#93c5fd] hover:translate-y-0.5 hover:shadow-none transition-all">
+                className="flex items-center justify-center px-3 py-2.5 bg-white border-4 border-blue-500 text-blue-600 font-bold text-sm hover:bg-blue-50 hover:border-blue-400 retro-border shadow-[3px_3px_0_0_#93c5fd] hover:translate-y-0.5 hover:shadow-none transition-all">
                 <Shirt className="mr-1.5" size={16} /> 外观选择
               </button>
             )}
@@ -148,7 +137,7 @@ const MainMenu: React.FC<MainMenuProps> = ({
 
           {/* BGM 选择器 */}
           {bgmName && (
-            <div className="flex items-center justify-between px-3 py-2 bg-white/70 border-4 border-blue-200 retro-border mt-1">
+            <div className="flex items-center justify-between px-3 py-2 bg-white border-4 border-blue-200 retro-border mt-1">
               <span className="flex items-center text-blue-500 text-xs font-bold"><Music size={14} className="mr-1.5" /> BGM</span>
               <div className="flex items-center gap-2">
                 <button onClick={onPrevBgm} className="text-blue-400 hover:text-pink-500 p-0.5"><ChevronLeft size={16} /></button>

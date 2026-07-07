@@ -22,12 +22,22 @@ type AfterDialogue = 'ENTER_LEVEL' | 'ADVANCE' | 'GALLERY';
 
 const SKIN_STORAGE_KEY = 'dousha3d_skin';
 const BGM_STORAGE_KEY = 'dousha_bgm';
-const loadBgmIndex = (): number => {
+const ANOMALY_STORAGE_KEY = 'dousha_sys_anomaly';
+// BGM 选项：0..N-1 单曲循环，N = 顺序播放，N+1 = 关闭
+const BGM_SEQ = BGM_TRACKS.length;
+const BGM_OFF = BGM_TRACKS.length + 1;
+const BGM_OPTION_COUNT = BGM_TRACKS.length + 2;
+const bgmOptionName = (sel: number) =>
+  sel < BGM_TRACKS.length ? BGM_TRACKS[sel].name : sel === BGM_SEQ ? '顺序播放全部' : '关闭 BGM';
+const loadBgmSel = (): number => {
   try {
     const v = parseInt(localStorage.getItem(BGM_STORAGE_KEY) ?? '0', 10);
-    if (v >= 0 && v < BGM_TRACKS.length) return v;
+    if (v >= 0 && v < BGM_OPTION_COUNT) return v;
   } catch { /* ignore */ }
   return 0;
+};
+const loadAnomaly = (): boolean => {
+  try { return localStorage.getItem(ANOMALY_STORAGE_KEY) === '1'; } catch { return false; }
 };
 const loadSkin = (): SkinId => {
   try {
@@ -63,30 +73,52 @@ const App: React.FC = () => {
   // BGM
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
-  const [bgmIndex, setBgmIndex] = useState<number>(loadBgmIndex);
+  const [bgmSel, setBgmSel] = useState<number>(loadBgmSel);
+  const bgmSelRef = useRef(bgmSel);
+  const seqIndexRef = useRef(0);
   const [matrixHack, setMatrixHack] = useState(false);
+  const [sysAnomaly, setSysAnomaly] = useState<boolean>(loadAnomaly);
+  useEffect(() => { bgmSelRef.current = bgmSel; }, [bgmSel]);
   useEffect(() => {
     if (!audioRef.current) {
-      audioRef.current = new Audio(BGM_TRACKS[bgmIndex].url);
-      audioRef.current.loop = true;
-      audioRef.current.volume = 0.4;
+      const initial = bgmSel < BGM_TRACKS.length ? bgmSel : 0;
+      const audio = new Audio(BGM_TRACKS[initial].url);
+      audio.loop = bgmSel < BGM_TRACKS.length;
+      audio.volume = 0.4;
+      // 顺序播放：一曲结束接下一曲
+      audio.onended = () => {
+        if (bgmSelRef.current !== BGM_SEQ || !audioRef.current) return;
+        seqIndexRef.current = (seqIndexRef.current + 1) % BGM_TRACKS.length;
+        audioRef.current.src = BGM_TRACKS[seqIndexRef.current].url;
+        audioRef.current.loop = false;
+        audioRef.current.play().catch(() => {});
+      };
+      audioRef.current = audio;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const selectBgm = (i: number) => {
-    const idx = (i + BGM_TRACKS.length) % BGM_TRACKS.length;
-    setBgmIndex(idx);
-    try { localStorage.setItem(BGM_STORAGE_KEY, String(idx)); } catch { /* ignore */ }
-    if (audioRef.current) {
-      const wasPlaying = !audioRef.current.paused;
-      audioRef.current.src = BGM_TRACKS[idx].url;
-      audioRef.current.loop = true;
-      if (wasPlaying || isMusicPlaying) {
-        audioRef.current.play().then(() => setIsMusicPlaying(true)).catch(() => {});
-      }
+    const sel = (i + BGM_OPTION_COUNT) % BGM_OPTION_COUNT;
+    setBgmSel(sel);
+    try { localStorage.setItem(BGM_STORAGE_KEY, String(sel)); } catch { /* ignore */ }
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (sel === BGM_OFF) {
+      audio.pause();
+      setIsMusicPlaying(false);
+      return;
     }
+    if (sel === BGM_SEQ) {
+      audio.src = BGM_TRACKS[seqIndexRef.current % BGM_TRACKS.length].url;
+      audio.loop = false;
+    } else {
+      audio.src = BGM_TRACKS[sel].url;
+      audio.loop = true;
+    }
+    audio.play().then(() => setIsMusicPlaying(true)).catch(() => {});
   };
   const tryPlayMusic = () => {
+    if (bgmSelRef.current === BGM_OFF) return;
     if (audioRef.current && !isMusicPlaying) {
       audioRef.current.play()
         .then(() => setIsMusicPlaying(true))
@@ -261,9 +293,10 @@ const App: React.FC = () => {
           hasSpecialCG={hasSpecialCG}
           onSpecialCG3D={() => { tryPlayMusic(); setGameState(GameState.SPECIAL_CG_3D); }}
           onCheatUnlock={handleCheatUnlock}
-          bgmName={BGM_TRACKS[bgmIndex].name}
-          onPrevBgm={() => { tryPlayMusic(); selectBgm(bgmIndex - 1); }}
-          onNextBgm={() => { tryPlayMusic(); selectBgm(bgmIndex + 1); }}
+          bgmName={bgmOptionName(bgmSel)}
+          onPrevBgm={() => selectBgm(bgmSel - 1)}
+          onNextBgm={() => selectBgm(bgmSel + 1)}
+          systemAnomaly={sysAnomaly}
         />
       )}
 
@@ -319,8 +352,12 @@ const App: React.FC = () => {
       {gameState === GameState.MATRIX_ENDING && (
         <MatrixEnding
           hackAccess={matrixHack}
-          onExit={() => {
-            if (isMusicPlaying) audioRef.current?.play().catch(() => {});
+          onExit={(hacked) => {
+            if (hacked) {
+              setSysAnomaly(true);
+              try { localStorage.setItem(ANOMALY_STORAGE_KEY, '1'); } catch { /* ignore */ }
+            }
+            if (isMusicPlaying && bgmSelRef.current !== BGM_OFF) audioRef.current?.play().catch(() => {});
             setGameState(GameState.MENU);
           }}
         />
