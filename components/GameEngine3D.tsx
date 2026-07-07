@@ -128,6 +128,10 @@ interface RtEnt extends AABB {
   fired?: boolean;            // TRIGGER 用
   shiftStart?: number;        // 重排动画开始时间（s.t）
   shiftDone?: boolean;
+  off?: boolean;              // FADE/CRUMBLE：当前无碰撞
+  crumbleAt?: number;         // CRUMBLE：被踩时刻
+  fallAt?: number;            // CRUMBLE：塌落时刻
+  bounceT?: number;           // BOUNCE：上次弹起时刻
 }
 
 const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLevel, onExit, isGameCleared }) => {
@@ -142,12 +146,15 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
   const [pandaMode, setPandaMode] = useState(false);
   const [pandaToast, setPandaToast] = useState('');
   const togglePandaRef = useRef<() => void>(() => {});
+  const cacheAnchorRef = useRef<() => void>(() => {});
+  const [cacheUsed, setCacheUsed] = useState(false);
 
   // ---- 外观能力 ----
   const dizzyEnabled = skin !== 'skinNovus';                  // 室友姐：不会晕3D
   const dizzyMul = skin === 'skin1' ? 0.5 : 1;                // 睡衣版：眩晕增长减半
   const candyRelief = skin === 'skin1' ? 60 : 40;             // 睡衣版：薄荷糖更有效
-  const switchCooldown = skin === 'skin2' ? 200 : LAYER_COOLDOWN; // 显示器头：切换冷却减半
+  const switchCooldown = LAYER_COOLDOWN;
+  const canCacheAnchor = skin === 'skin2';                    // 电视头：按 E 部署一次临时存档锚点
   const canDoubleJump = skin === 'skin3';                     // 熊猫外套：二段跳
   const hasBandaid = skin === 'skin4';                        // 独眼露目：创可贴挡一次尖刺
   const [showTitle, setShowTitle] = useState(true);
@@ -168,6 +175,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
     panda: false,
     typed: '',
     shakeT: 0,
+    cacheUsed: false,
     lastSwitch: 0,
     t: 0,
     deaths: 0,
@@ -241,6 +249,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
         case 'KeyD': case 'ArrowRight': e.preventDefault(); s.keys.r = true; break;
         case 'Space': e.preventDefault(); s.jumpBufferT = JUMP_BUFFER; s.keys.up = true; break;
         case 'ShiftLeft': case 'ShiftRight': s.keys.down = true; break;
+        case 'KeyE': cacheAnchorRef.current(); break;
         case 'KeyQ': if (!s.isDead) handleLayerSwitch(); break;
         case 'Escape': onExitRef.current(); break;
       }
@@ -439,6 +448,49 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
             const s = 1 + Math.sin(t * 2.2) * 0.04;
             g.scale.set(s, s, s);
           });
+      } else if (e.type === 'BOUNCE') {
+        const w = e.w ?? 2.2;
+        const stem = new THREE.Mesh(new THREE.CylinderGeometry(w * 0.28, w * 0.34, 0.5, 8),
+          new THREE.MeshStandardMaterial({ color: 0xfdf3e2, flatShading: true, roughness: 1 }));
+        stem.position.y = -0.2;
+        const cap = new THREE.Mesh(new THREE.SphereGeometry(w * 0.5, 10, 6, 0, Math.PI * 2, 0, Math.PI * 0.5),
+          new THREE.MeshStandardMaterial({ color: 0xf973b6, flatShading: true, roughness: 0.9 }));
+        cap.position.y = 0.05;
+        const dot1 = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 5),
+          new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true }));
+        dot1.position.set(w * 0.2, 0.28, w * 0.15);
+        const dot2 = dot1.clone(); dot2.position.set(-w * 0.22, 0.24, -w * 0.1);
+        stem.castShadow = true; cap.castShadow = true;
+        g.add(stem, cap, dot1, dot2);
+        const rtB = { hw: (e.w ?? 2.2) / 2, hh: (e.h ?? 0.4) / 2, hd: (e.d ?? 2.2) / 2 };
+        push(e, g, rtB, (_l, active) => { g.visible = active; },
+          (t) => {
+            const rt = ents.find(r => r.ent.id === e.id);
+            const since = rt?.bounceT !== undefined ? t - rt.bounceT : 99;
+            const squash = since < 0.3 ? 1 - Math.sin((since / 0.3) * Math.PI) * 0.35 : 1;
+            cap.scale.set(1 / Math.sqrt(squash), squash, 1 / Math.sqrt(squash));
+          });
+      } else if (e.type === 'FADE') {
+        const w = e.w ?? 2.6, h = e.h ?? 0.5, d = e.d ?? 2.6;
+        const geo = new THREE.BoxGeometry(w, h, d);
+        const fadeMat = new THREE.MeshStandardMaterial({ color: 0x9ad6e8, flatShading: true, roughness: 0.9, transparent: true, opacity: 0.95 });
+        const mesh = new THREE.Mesh(geo, fadeMat);
+        mesh.castShadow = true; mesh.receiveShadow = true;
+        const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0x0e7490, transparent: true, opacity: 0.8 }));
+        g.add(mesh, edges);
+        const rt2 = { hw: w / 2, hh: h / 2, hd: d / 2 };
+        push(e, g, rt2, (_l, active) => { g.visible = active; });
+        (ents[ents.length - 1] as any).fadeMat = fadeMat;
+      } else if (e.type === 'CRUMBLE') {
+        const w = e.w ?? 2.6, h = e.h ?? 0.5, d = e.d ?? 2.6;
+        const geo = new THREE.BoxGeometry(w, h, d);
+        const crMat = new THREE.MeshStandardMaterial({ color: 0xb08968, flatShading: true, roughness: 1, transparent: true, opacity: 1 });
+        const mesh = new THREE.Mesh(geo, crMat);
+        mesh.castShadow = true; mesh.receiveShadow = true;
+        const cracks = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0x3f2d20 }));
+        g.add(mesh, cracks);
+        push(e, g, { hw: w / 2, hh: h / 2, hd: d / 2 }, (_l, active) => { g.visible = active; });
+        (ents[ents.length - 1] as any).crMat = crMat;
       } else if (e.type === 'TRIGGER') {
         push(e, g, { hw: (e.w ?? 3) / 2, hh: (e.h ?? 3) / 2, hd: (e.d ?? 3) / 2 },
           () => { g.visible = false; });
@@ -514,6 +566,29 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
     };
     togglePandaRef.current = () => setPanda(!s.panda);
 
+    // 电视头小豆：缓存锚点（蓝色全息标记）
+    const cacheMarker = new THREE.Group();
+    const holoCol = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, 1.6, 8, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0x7db4ff, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false }));
+    holoCol.position.y = 0.8;
+    const holoCore = new THREE.Mesh(new THREE.OctahedronGeometry(0.2),
+      new THREE.MeshBasicMaterial({ color: 0x7db4ff, transparent: true, opacity: 0.9 }));
+    holoCore.position.y = 1.0;
+    cacheMarker.add(holoCol, holoCore);
+    cacheMarker.visible = false;
+    scene.add(cacheMarker);
+    cacheAnchorRef.current = () => {
+      if (!canCacheAnchor || s.cacheUsed || !s.p.grounded || s.isDead || s.panda) return;
+      s.cacheUsed = true;
+      s.spawn = { x: s.p.x, y: s.p.y + 0.2, z: s.p.z };
+      cacheMarker.position.set(s.p.x, s.p.y - PLAYER.hh, s.p.z);
+      cacheMarker.visible = true;
+      setCacheUsed(true);
+      setPandaToast('⚡ 缓存锚点已部署！倒下后会从这里醒来');
+      setTimeout(() => setPandaToast(''), 2600);
+      particles.burst(new THREE.Vector3(s.p.x, s.p.y, s.p.z), 0x7db4ff, 26, 2.5, 3);
+    };
+
     // ---- 室友姐 NPC：先走一步，在终点门旁等你（她不受次元影响，始终是彩色的） ----
     const goalEnt = levelConfig.entities.find(en => en.type === 'GOAL');
     let novus: ReturnType<typeof buildCharacter> | null = null;
@@ -535,6 +610,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
     s.airJumpOk = false;
     s.shieldOk = true;
     s.invulnT = 0;
+    s.cacheUsed = false;
     s.t = 0; s.deaths = 0;
     s.startTime = Date.now();
     layerRef.current = Layer.REAL;
@@ -544,7 +620,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
     const listsFor = (layer: Layer) => {
       const act = ents.filter(r => isActive(r.ent, layer));
       return {
-        solids: act.filter(r => r.ent.type === 'PLATFORM' || r.ent.type === 'MOVER'),
+        solids: act.filter(r => ['PLATFORM', 'MOVER', 'FADE', 'CRUMBLE', 'BOUNCE'].includes(r.ent.type)),
         hazards: act.filter(r => r.ent.type === 'HAZARD'),
         pickups: act.filter(r => r.ent.type === 'PAGE' || r.ent.type === 'SHARD'),
         goals: act.filter(r => r.ent.type === 'GOAL'),
@@ -555,6 +631,8 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
     const movers = ents.filter(r => r.ent.type === 'MOVER');
     const triggers = ents.filter(r => r.ent.type === 'TRIGGER');
     const shifters = ents.filter(r => r.ent.shiftTo !== undefined);
+    const fades = ents.filter(r => r.ent.type === 'FADE');
+    const crumbles = ents.filter(r => r.ent.type === 'CRUMBLE');
 
     // ---- 相机操控（拖动环绕 / 滚轮缩放） ----
     let dragging = false;
@@ -622,6 +700,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
       const half = axis === 'x' ? 'hw' : axis === 'y' ? 'hh' : 'hd';
       let landed: RtEnt | null = null;
       for (const e of solids) {
+        if (e.off) continue;
         if (!overlap(playerBox(), e)) continue;
         const sum = (PLAYER as any)[half] + (e as any)[half];
         const prevDelta = prevVal - e[axis];
@@ -681,6 +760,50 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
         }
       }
       s.shakeT = Math.max(0, s.shakeT - STEP);
+
+      // 闪烁平台：按相位显隐
+      for (const f of fades) {
+        const period = f.ent.fadePeriod ?? 3;
+        const phase = Math.sin((s.t / period) * Math.PI * 2 + (f.ent.fadeOffset ?? 0));
+        f.off = phase <= -0.25;
+        const m = (f as any).fadeMat as THREE.MeshStandardMaterial | undefined;
+        if (m) {
+          // 即将消失时快速闪烁预警
+          const warn = phase > -0.25 && phase < 0.05;
+          const target = f.off ? 0.1 : warn ? (Math.sin(s.t * 24) > 0 ? 0.9 : 0.45) : 0.95;
+          m.opacity += (target - m.opacity) * 0.35;
+        }
+      }
+      // 碎裂平台：被踩 → 摇晃 → 塌落 → 重生
+      for (const c of crumbles) {
+        const m = (c as any).crMat as THREE.MeshStandardMaterial | undefined;
+        if (c.crumbleAt !== undefined && !c.off) {
+          const held = s.t - c.crumbleAt;
+          c.group.position.set(
+            c.x + (Math.random() - 0.5) * 0.06 * held * 2,
+            c.y,
+            c.z + (Math.random() - 0.5) * 0.06 * held * 2,
+          );
+          if (held > 0.55) {
+            c.off = true;
+            c.fallAt = s.t;
+            particles.burst(new THREE.Vector3(c.x, c.y, c.z), 0xb08968, 20, 2.5, 1.5);
+          }
+        }
+        if (c.off && c.fallAt !== undefined) {
+          const fell = s.t - c.fallAt;
+          c.group.position.y = c.y - Math.min(3, fell * 4);
+          if (m) m.opacity = Math.max(0, 1 - fell * 1.6);
+          if (fell > 2.6) {
+            c.off = false;
+            c.crumbleAt = undefined;
+            c.fallAt = undefined;
+            c.group.position.set(c.x, c.y, c.z);
+            if (m) m.opacity = 1;
+            particles.burst(new THREE.Vector3(c.x, c.y + 0.4, c.z), 0xffffff, 10, 1.5, 1.5);
+          }
+        }
+      }
 
       if (s.isDead) return false;
 
@@ -787,6 +910,19 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
       const landedOn = resolveAxis('y', py0, lists.solids);
       p.grounded = !!landedOn;
       p.groundEnt = landedOn;
+      if (landedOn) {
+        if (landedOn.ent.type === 'BOUNCE') {
+          p.vy = 13.5;
+          p.grounded = false;
+          p.groundEnt = null;
+          s.coyoteT = 0;
+          s.airJumpOk = true;
+          landedOn.bounceT = s.t;
+          particles.burst(new THREE.Vector3(p.x, p.y - PLAYER.hh, p.z), 0xf973b6, 18, 2.5, 2);
+        } else if (landedOn.ent.type === 'CRUMBLE' && landedOn.crumbleAt === undefined && !landedOn.off) {
+          landedOn.crumbleAt = s.t;
+        }
+      }
 
       if (p.grounded && !wasGrounded) {
         particles.burst(new THREE.Vector3(p.x, p.y - PLAYER.hh, p.z), 0xd6e4f5, 12, 2, 1.2);
@@ -940,6 +1076,10 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
         clouds[i].position.x += 0.25 * dt * ((i % 3) + 1);
         if (clouds[i].position.x > maxX + 14) clouds[i].position.x = -8;
       }
+      if (cacheMarker.visible) {
+        holoCore.rotation.y += dt * 2.5;
+        holoCore.position.y = 1.0 + Math.sin(s.t * 2.5) * 0.1;
+      }
       particles.update(dt);
 
       // 第三人称环绕相机
@@ -1041,7 +1181,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
         <div className="px-3 py-2 bg-white/85 border-4 border-emerald-300 retro-border text-emerald-700 text-xs font-bold shadow-lg">
           {pandaMode && '✨ 魔法熊猫'}
           {!pandaMode && skin === 'skin1' && '☁ 安心毛绒'}
-          {!pandaMode && skin === 'skin2' && '⚡ 高速处理'}
+          {!pandaMode && skin === 'skin2' && (cacheUsed ? '⚡ 缓存锚点(已用)' : '⚡ 缓存锚点(按E)')}
           {!pandaMode && skin === 'skin3' && '★ 二段跳'}
           {!pandaMode && skin === 'skin4' && (shieldUsed ? '✕ 创可贴(已用)' : '✚ 创可贴')}
           {!pandaMode && skin === 'skinNovus' && '∞ 次元之外'}

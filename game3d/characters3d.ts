@@ -19,8 +19,8 @@ export interface SkinMeta {
 
 export const SKINS: SkinMeta[] = [
   { id: 'skin1', name: '毛绒小豆', vibe: '软萌 · 安静 · 治愈', features: ['猫耳睡帽 + 银白短发', '眼罩遮右眼', '蓝白睡衣风', '怀里抱着熊猫玩偶', '能力「安心毛绒」：眩晕增长减半，薄荷糖效果更强'] },
-  { id: 'skin2', name: '电视头小豆', vibe: 'AI · 机器人 · 电子吉祥物', features: ['身体与1号相同', '头部是一块显示器', '屏幕上是睡眼猫嘴表情', '顶部机械耳', '能力「高速处理」：次元切换冷却减半'] },
-  { id: 'skin3', name: '大墨镜小李', vibe: '活泼 · 外向 · 冒险感', features: ['及腰长白发', '宽大蓝色外套', '熊猫耳 + 护目镜', '白色连衣裙', '能力「冒险家」：可以二段跳！'] },
+  { id: 'skin2', name: '电视头小豆', vibe: 'AI · 机器人 · 电子吉祥物', features: ['身体与1号相同', '头部是一块显示器', '屏幕上是睡眼猫嘴表情', '顶部机械耳', '能力「缓存锚点」：按 E 在脚下部署一次性临时存档点'] },
+  { id: 'skin3', name: '大墨镜小李', vibe: '活泼 · 外向 · 冒险感', features: ['及腰长白发', '宽大蓝色外套', '熊猫耳 + 护目镜', '能力「冒险家」：可以二段跳！'] },
   { id: 'skin4', name: '眼罩小豆', vibe: '安静 · 病弱 · 神秘', features: ['银白短发双侧扎', '单眼眼罩 + 熊猫耳', '白蓝色居家服', '腿上贴着创可贴', '能力「创可贴」：每个存档点区间可抵挡一次尖刺'] },
   { id: 'skinNovus', name: '？号 · 室友姐', vibe: '可靠 · 从容 · 温柔', features: ['橘色齐颈发 + 猫耳', '奶油色家居服', '口袋里永远有薄荷糖', '能力「次元之外」：完全不会晕3D'] },
 ];
@@ -218,7 +218,7 @@ export const buildCharacter = (skin: SkinId): CharacterRig => {
     // 白裙 + 宽大蓝外套（外套更宽更长）
     const dress = box(0.4, 0.44, 0.26, COL.white);
     dress.position.y = 0.66;
-    const dressHem = box(0.46, 0.1, 0.3, 0xf1f5f9);
+    const dressHem = box(0.44, 0.14, 0.3, 0x1f2937); // 黑色短裤
     dressHem.position.y = 0.46;
     const jacket = box(0.6, 0.46, 0.4, topColor);
     jacket.position.set(0, 0.7, -0.03);
