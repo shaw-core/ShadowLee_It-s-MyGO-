@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GameState, AffectionState, YuriEvent, LevelResult, EntityType } from './types';
-import { EVENTS, LEVELS, BGM_URL, TOTAL_COLLECTIBLES_COUNT as TOTAL_2D } from './constants';
+import { EVENTS, LEVELS, TOTAL_COLLECTIBLES_COUNT as TOTAL_2D } from './constants';
+import { BGM_TRACKS } from './music';
 import { LEVELS3D, TOTAL_COLLECTIBLES_COUNT as TOTAL_3D } from './game3d/levels3d';
 import { EVENTS3D } from './game3d/story3d';
 import { SkinId } from './game3d/characters3d';
@@ -20,6 +21,14 @@ type GameMode = '2d' | '3d';
 type AfterDialogue = 'ENTER_LEVEL' | 'ADVANCE' | 'GALLERY';
 
 const SKIN_STORAGE_KEY = 'dousha3d_skin';
+const BGM_STORAGE_KEY = 'dousha_bgm';
+const loadBgmIndex = (): number => {
+  try {
+    const v = parseInt(localStorage.getItem(BGM_STORAGE_KEY) ?? '0', 10);
+    if (v >= 0 && v < BGM_TRACKS.length) return v;
+  } catch { /* ignore */ }
+  return 0;
+};
 const loadSkin = (): SkinId => {
   try {
     const v = localStorage.getItem(SKIN_STORAGE_KEY);
@@ -54,13 +63,29 @@ const App: React.FC = () => {
   // BGM
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
+  const [bgmIndex, setBgmIndex] = useState<number>(loadBgmIndex);
+  const [matrixHack, setMatrixHack] = useState(false);
   useEffect(() => {
     if (!audioRef.current) {
-      audioRef.current = new Audio(BGM_URL);
+      audioRef.current = new Audio(BGM_TRACKS[bgmIndex].url);
       audioRef.current.loop = true;
       audioRef.current.volume = 0.4;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  const selectBgm = (i: number) => {
+    const idx = (i + BGM_TRACKS.length) % BGM_TRACKS.length;
+    setBgmIndex(idx);
+    try { localStorage.setItem(BGM_STORAGE_KEY, String(idx)); } catch { /* ignore */ }
+    if (audioRef.current) {
+      const wasPlaying = !audioRef.current.paused;
+      audioRef.current.src = BGM_TRACKS[idx].url;
+      audioRef.current.loop = true;
+      if (wasPlaying || isMusicPlaying) {
+        audioRef.current.play().then(() => setIsMusicPlaying(true)).catch(() => {});
+      }
+    }
+  };
   const tryPlayMusic = () => {
     if (audioRef.current && !isMusicPlaying) {
       audioRef.current.play()
@@ -196,6 +221,8 @@ const App: React.FC = () => {
     } else {
       // 后编通关：黑屏 → 矩阵终端结局（合影可从主菜单回看）
       setCleared3D(true);
+      setMatrixHack(effectiveSkin === 'skin2'); // 电视头小豆：TVHEAD_ADMIN 权限
+      audioRef.current?.pause();               // 让位给终端的电子音效
       setGameState(GameState.MATRIX_ENDING);
     }
   };
@@ -234,6 +261,9 @@ const App: React.FC = () => {
           hasSpecialCG={hasSpecialCG}
           onSpecialCG3D={() => { tryPlayMusic(); setGameState(GameState.SPECIAL_CG_3D); }}
           onCheatUnlock={handleCheatUnlock}
+          bgmName={BGM_TRACKS[bgmIndex].name}
+          onPrevBgm={() => { tryPlayMusic(); selectBgm(bgmIndex - 1); }}
+          onNextBgm={() => { tryPlayMusic(); selectBgm(bgmIndex + 1); }}
         />
       )}
 
@@ -287,7 +317,13 @@ const App: React.FC = () => {
       )}
 
       {gameState === GameState.MATRIX_ENDING && (
-        <MatrixEnding onExit={() => setGameState(GameState.MENU)} />
+        <MatrixEnding
+          hackAccess={matrixHack}
+          onExit={() => {
+            if (isMusicPlaying) audioRef.current?.play().catch(() => {});
+            setGameState(GameState.MENU);
+          }}
+        />
       )}
 
       {gameState === GameState.SPECIAL_CG_3D && (

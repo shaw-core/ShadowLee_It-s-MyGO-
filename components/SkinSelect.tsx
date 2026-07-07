@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { ArrowLeft, ChevronLeft, ChevronRight, Check } from 'lucide-react';
-import { SKINS, SkinId, buildCharacter } from '../game3d/characters3d';
+import { SKINS, SkinId, buildCharacter, buildPandaWitch } from '../game3d/characters3d';
 
 interface SkinSelectProps {
   currentSkin: SkinId;
@@ -12,14 +12,40 @@ interface SkinSelectProps {
 
 const SkinSelect: React.FC<SkinSelectProps> = ({ currentSkin, novusUnlocked, onConfirm, onBack }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [pandaRevealed, setPandaRevealed] = useState(false);
+  const PANDA_ENTRY = {
+    id: 'panda' as const,
+    name: '？？？ · 魔法熊猫',
+    vibe: '？？？',
+    features: ['？？？？？？', '在游戏中输入 shadow，即可变身为魔法熊猫', '来历不明——似乎与某种神秘的力量有关', '它不属于任何人，也无法被选择'],
+  };
+  const displayList = pandaRevealed ? [...SKINS, PANDA_ENTRY] : SKINS;
   const [index, setIndex] = useState(Math.max(0, SKINS.findIndex(s => s.id === currentSkin)));
-  const skin = SKINS[index];
+  const skin = displayList[Math.min(index, displayList.length - 1)];
   const isLocked = skin.id === 'skinNovus' && !novusUnlocked;
+  const isPanda = skin.id === 'panda';
+
+  // 彩蛋：在外观界面输入 shadow，显现魔法熊猫的档案
+  useEffect(() => {
+    let typed = '';
+    const onKey = (e: KeyboardEvent) => {
+      if (!/^[a-z]$/i.test(e.key)) return;
+      typed = (typed + e.key.toLowerCase()).slice(-6);
+      if (typed === 'shadow') {
+        typed = '';
+        setPandaRevealed(true);
+        setIndex(SKINS.length); // 直接翻到熊猫页
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // 实时 3D 预览：角色缓慢旋转 + 待机动画
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || isLocked) return;
+    const isPandaPreview = skin.id === 'panda';
 
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
     renderer.setSize(320, 380, false);
@@ -47,7 +73,8 @@ const SkinSelect: React.FC<SkinSelectProps> = ({ currentSkin, novusUnlocked, onC
     stand.receiveShadow = true;
     scene.add(stand);
 
-    const rig = buildCharacter(skin.id);
+    const rig = isPandaPreview ? buildPandaWitch() : buildCharacter(skin.id as SkinId);
+    if (isPandaPreview) rig.group.position.y = 0.35; // 骑扫帚悬浮展示
     scene.add(rig.group);
 
     let raf = 0;
@@ -80,8 +107,8 @@ const SkinSelect: React.FC<SkinSelectProps> = ({ currentSkin, novusUnlocked, onC
     };
   }, [skin.id, isLocked]);
 
-  const prev = () => setIndex(i => (i - 1 + SKINS.length) % SKINS.length);
-  const next = () => setIndex(i => (i + 1) % SKINS.length);
+  const prev = () => setIndex(i => (i - 1 + displayList.length) % displayList.length);
+  const next = () => setIndex(i => (i + 1) % displayList.length);
 
   return (
     <div className="w-full h-screen flex flex-col items-center bg-[#FEF7CD] text-blue-900 font-pixel relative overflow-y-auto">
@@ -123,26 +150,26 @@ const SkinSelect: React.FC<SkinSelectProps> = ({ currentSkin, novusUnlocked, onC
 
       {/* 四格快速切换 */}
       <div className="flex gap-3 mt-4">
-        {SKINS.map((sm, i) => {
+        {displayList.map((sm, i) => {
           const lockedCell = sm.id === 'skinNovus' && !novusUnlocked;
           return (
             <button key={sm.id} onClick={() => setIndex(i)}
               className={`w-10 h-10 border-4 font-bold ${
                 i === index ? 'bg-pink-500 border-pink-700 text-white' : 'bg-white border-blue-200 text-blue-400 hover:border-blue-400'
               }`}>
-              {lockedCell ? '🔒' : sm.id === 'skinNovus' ? '室' : i + 1}
+              {lockedCell ? '🔒' : sm.id === 'skinNovus' ? '室' : sm.id === 'panda' ? '★' : i + 1}
             </button>
           );
         })}
       </div>
 
-      <button onClick={() => !isLocked && onConfirm(skin.id)} disabled={isLocked}
+      <button onClick={() => !isLocked && !isPanda && onConfirm(skin.id as SkinId)} disabled={isLocked || isPanda}
         className={`mt-8 flex items-center px-8 py-3 font-bold text-xl border-4 retro-border ${
-          isLocked
+          isLocked || isPanda
             ? 'bg-gray-300 text-gray-500 border-gray-400 cursor-not-allowed'
             : 'bg-blue-500 text-white border-blue-700 hover:bg-blue-400 shadow-[4px_4px_0_0_#1e3a8a] hover:translate-y-1 hover:shadow-none'
         }`}>
-        <Check className="mr-2" /> {isLocked ? '尚未解锁' : '就决定是你了！'}
+        <Check className="mr-2" /> {isPanda ? '它不属于任何人' : isLocked ? '尚未解锁' : '就决定是你了！'}
       </button>
       </div>
     </div>

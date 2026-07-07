@@ -4,7 +4,7 @@
 // Kimo熊不是幕后黑手，是这个 LowPoly 世界的引路人和守护者：
 // 不能改变世界规则，只能在规则允许的地方放锚点，
 // 把掉落的两人接回安全位置。终章于裂缝旁的最后一个锚点现身。
-// 主题：Kimo熊能接住豆沙的失败，但不能替她走出这个世界。
+// 主题：Kimo熊能把豆沙的失败回档，但不能替她走出这个世界。
 // 真正陪豆沙跳进未知的，是室友姐。
 // ============================================================
 import { YuriEvent } from '../types';
@@ -136,7 +136,7 @@ export const EVENTS3D: Record<string, YuriEvent> = {
         text: '不是。',
         choices: [{ id: 'c', text: '那它到底是在存档，还是在救我？', nextNodeId: 's6' }] },
       's6': { id: 's6', speakerName: '室友姐',
-        text: '也许两者都是。至少，它把你送回来了。',
+        text: '也许两者都是。至少，它把你的坐标回档到了安全的位置。',
         choices: [{ id: 'c', text: '那这个熊猫就是 Kimo 熊？', nextNodeId: 's7' }] },
       's7': { id: 's7', speakerName: '室友姐',
         text: '还不能确定。但名字对得上。',
@@ -162,7 +162,7 @@ export const EVENTS3D: Record<string, YuriEvent> = {
         text: '（很轻地叹了口气，蹲下来和你平视）说什么呢。你醒来的每一次，我哪次不在？',
         choices: [{ id: 'c', text: '（……好像，确实每次都在。）', nextNodeId: 'end' }] },
       'end': { id: 'end', speakerName: '李豆沙',
-        text: '（第二张纸条。原来每一次复活，都有谁在接住我。）',
+        text: '（第二张纸条。原来每一次复活，都是有谁在把我的数据读档回来。）',
         choices: [{ id: 'c', text: '……', nextNodeId: null }] },
     },
   },
@@ -199,11 +199,11 @@ export const EVENTS3D: Record<string, YuriEvent> = {
         text: '比如——我们走到了不该知道的地方。',
         choices: [{ id: 'c', text: '（在熊猫存档点旁边发现了第三张纸条）', nextNodeId: 's9' }] },
       's9': { id: 's9', speakerName: '李豆沙',
-        text: '（纸条：我不能改路。也不能阻止世界重排。我只能在你们掉下去的时候，把你们带回还能继续走的地方。——Kimo熊）',
+        text: '（纸条：我不能改路。也不能阻止世界重排。我只能在你们坠落的时候，把你们的数据回滚到还能继续走的位置。——Kimo熊）',
         choices: [{ id: 'c', text: '所以之前每次复活，都是它……', nextNodeId: 's10' }],
         backgroundStyle: 'MANGA' },
       's10': { id: 's10', speakerName: '室友姐',
-        text: '嗯。不是系统，也不是世界的温柔。是有人一直在接住你。',
+        text: '嗯。不是系统，也不是世界的温柔。是有人一直守着你的存档，在你坠落的瞬间把你回滚回来。',
         choices: [{ id: 'c', text: '那它自己呢？', nextNodeId: 's11' }] },
       's11': { id: 's11', speakerName: '室友姐',
         text: '它大概一直留在原地。',
@@ -225,7 +225,7 @@ export const EVENTS3D: Record<string, YuriEvent> = {
         text: '（黑白的线框世界里，只有她的声音是有温度的）……一直都在看。从第一层就在看。',
         choices: [{ id: 'c', text: '（心跳声在线框层里格外清楚。）', nextNodeId: 'end' }] },
       'end': { id: 'end', speakerName: '李豆沙',
-        text: '(第三张纸条。它不能改变规则——但它一直在规则的缝隙里，接住我。）',
+        text: '(第三张纸条。它不能改写规则——但它一直在规则的缝隙里，替我保管着每一份存档。）',
         choices: [{ id: 'c', text: '……', nextNodeId: null }] },
     },
   },
@@ -282,7 +282,7 @@ export const EVENTS3D: Record<string, YuriEvent> = {
         text: '（很久没有说话。云从脚下飘过去。然后她伸出手，把你的手攥进掌心）……那这个方向，以后不会再换地方了。',
         choices: [{ id: 'c', text: '（用力点头。）', nextNodeId: 'end' }] },
       'end': { id: 'end', speakerName: '李豆沙',
-        text: '（第四张纸条。下一次，就能见到一直接住我的那个家伙了。）',
+        text: '（第四张纸条。下一次，就能见到一直守着我存档的那个家伙了。）',
         choices: [{ id: 'c', text: '……', nextNodeId: null }] },
     },
   },
@@ -315,7 +315,7 @@ export const EVENTS3D: Record<string, YuriEvent> = {
         text: '因为我不能离开锚点太远。我在等你们，走到最后一个存档点。——这里。',
         choices: [{ id: 'c', text: '（Kimo熊看向裂缝）', nextNodeId: 's8' }] },
       's8': { id: 's8', speakerName: 'Kimo熊',
-        text: '过了这里，就没有我能接住你们的地方了。跳进去以后，你们不会再回到我这里。也可能，不会回到任何地方。',
+        text: '过了这里，就超出我锚点的写入范围了。你们的坐标，我再也读取不到——跳进去以后，没有回档，没有读取，也可能，不会落在任何地方。',
         choices: [{ id: 'c', text: '（小室：所以这是不能重来的跳跃。）', nextNodeId: 's9' }],
         backgroundStyle: 'MANGA' },
       's9': { id: 's9', speakerName: 'Kimo熊',
@@ -326,8 +326,8 @@ export const EVENTS3D: Record<string, YuriEvent> = {
         choices: [{ id: 'c', text: '（沉默。裂缝的光在两个人脸上明明灭灭。）', nextNodeId: 's11' }],
         backgroundStyle: 'MANGA' },
       's11': { id: 's11', speakerName: '室友姐',
-        text: '豆沙。这次如果掉下去，可能没有 Kimo 熊接住你。',
-        choices: [{ id: 'c', text: '那你接住我。', nextNodeId: 's12' }] },
+        text: '豆沙。这次如果掉下去，没有人能再把你回档了。',
+        choices: [{ id: 'c', text: '那你来当我的存档点。', nextNodeId: 's12' }] },
       's12': { id: 's12', speakerName: '室友姐',
         text: '好。',
         choices: [
