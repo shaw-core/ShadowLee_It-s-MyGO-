@@ -47,19 +47,26 @@ const hashStr = (s: string) => {
 // 提示文字 Sprite
 const makeTextSprite = (text: string, color = '#1e3a8a'): THREE.Sprite => {
   const canvas = document.createElement('canvas');
-  canvas.width = 1024; canvas.height = 128;
+  canvas.width = 2048; canvas.height = 128;
   const g = canvas.getContext('2d')!;
-  g.font = 'bold 52px "Noto Sans SC", sans-serif';
+  // 超长文本自动缩小字号，保证不截断
+  let fontSize = 52;
+  g.font = `bold ${fontSize}px "Noto Sans SC", sans-serif`;
+  const w = g.measureText(text).width;
+  if (w > 1940) {
+    fontSize = Math.max(30, Math.floor(52 * 1940 / w));
+    g.font = `bold ${fontSize}px "Noto Sans SC", sans-serif`;
+  }
   g.textAlign = 'center'; g.textBaseline = 'middle';
   g.strokeStyle = 'rgba(255,255,255,0.9)';
   g.lineWidth = 10; g.lineJoin = 'round';
-  g.strokeText(text, 512, 66);
+  g.strokeText(text, 1024, 66);
   g.fillStyle = color;
-  g.fillText(text, 512, 66);
+  g.fillText(text, 1024, 66);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
-  sp.scale.set(9, 1.125, 1);
+  sp.scale.set(18, 1.125, 1);
   return sp;
 };
 
@@ -162,6 +169,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
 
   const stateRef = useRef({
     p: { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, grounded: false, groundEnt: null as RtEnt | null },
+    pp: { x: 0, y: 0, z: 0 },   // 上一物理帧位置（渲染插值用）
     keys: { f: false, b: false, l: false, r: false, up: false, down: false },
     jumpBufferT: 0,
     coyoteT: 0,
@@ -202,6 +210,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
     const s = stateRef.current;
     s.spawn = { ...levelConfig.spawn };
     s.p.x = s.spawn.x; s.p.y = s.spawn.y; s.p.z = s.spawn.z;
+    s.pp.x = s.p.x; s.pp.y = s.p.y; s.pp.z = s.p.z;
     s.p.vx = 0; s.p.vy = 0; s.p.vz = 0;
     s.collected.clear();
     s.isDead = false;
@@ -641,6 +650,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
     const s = stateRef.current;
     s.spawn = { ...levelConfig.spawn };
     s.p.x = s.spawn.x; s.p.y = s.spawn.y; s.p.z = s.spawn.z;
+    s.pp.x = s.p.x; s.pp.y = s.p.y; s.pp.z = s.p.z;
     s.p.vx = 0; s.p.vy = 0; s.p.vz = 0;
     s.collected.clear();
     s.isDead = false;
@@ -718,6 +728,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
       pandaRig.group.visible = false;
       respawnTimer = setTimeout(() => {
         s.p.x = s.spawn.x; s.p.y = s.spawn.y; s.p.z = s.spawn.z;
+        s.pp.x = s.p.x; s.pp.y = s.p.y; s.pp.z = s.p.z;
         s.p.vx = 0; s.p.vy = 0; s.p.vz = 0;
         s.keys.f = s.keys.b = s.keys.l = s.keys.r = false;
         s.isDead = false;
@@ -757,6 +768,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
     const stepLogic = (): boolean => {
       s.t += STEP;
       const p = s.p;
+      s.pp.x = p.x; s.pp.y = p.y; s.pp.z = p.z;
 
       // 移动平台先走一步
       for (const m of movers) {
@@ -1035,13 +1047,17 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
     };
 
     const camPos = new THREE.Vector3();
-    const draw = (dt: number) => {
+    const draw = (dt: number, alpha: number) => {
       const p = s.p;
+      // 渲染插值：在上一物理帧与当前帧之间取 alpha 位置
+      const px = s.pp.x + (p.x - s.pp.x) * alpha;
+      const py = s.pp.y + (p.y - s.pp.y) * alpha;
+      const pz = s.pp.z + (p.z - s.pp.z) * alpha;
 
       // 角色姿态
-      rig.group.position.set(p.x, p.y - PLAYER.hh, p.z);
+      rig.group.position.set(px, py - PLAYER.hh, pz);
       if (s.panda) {
-        pandaRig.group.position.set(p.x, p.y - PLAYER.hh + 0.1, p.z);
+        pandaRig.group.position.set(px, py - PLAYER.hh + 0.1, pz);
         if (!s.isDead) { pandaRig.group.visible = true; rig.group.visible = false; }
         const movingP = Math.hypot(p.vx, p.vz) > 0.4;
         if (movingP) facing = Math.atan2(p.vx, p.vz);
@@ -1088,11 +1104,18 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
         rig.head.rotation.x = Math.sin(t * 1.4) * 0.04;
       }
 
+      for (const m of movers) {
+        m.group.position.set(
+          m.prev.x + (m.x - m.prev.x) * alpha,
+          m.prev.y + (m.y - m.prev.y) * alpha,
+          m.prev.z + (m.z - m.prev.z) * alpha,
+        );
+      }
       for (const r of ents) r.animate?.(t);
       // 室友姐 NPC：望向你，靠近时挥手 + 爱心粒子
       if (novus) {
         const nx = novus.group.position.x, nz = novus.group.position.z;
-        const dxp = p.x - nx, dzp = p.z - nz;
+        const dxp = px - nx, dzp = pz - nz;
         const distN = Math.hypot(dxp, dzp);
         let na = Math.atan2(dxp, dzp) - novus.group.rotation.y;
         while (na > Math.PI) na -= Math.PI * 2;
@@ -1124,9 +1147,9 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
       // 第三人称环绕相机
       const cy = s.cam;
       camPos.set(
-        p.x + Math.sin(cy.yaw) * Math.cos(cy.pitch) * cy.dist,
-        p.y + Math.sin(cy.pitch) * cy.dist + 0.6,
-        p.z + Math.cos(cy.yaw) * Math.cos(cy.pitch) * cy.dist,
+        px + Math.sin(cy.yaw) * Math.cos(cy.pitch) * cy.dist,
+        py + Math.sin(cy.pitch) * cy.dist + 0.6,
+        pz + Math.cos(cy.yaw) * Math.cos(cy.pitch) * cy.dist,
       );
       if (s.dizzy > 35) {
         const k = (s.dizzy - 35) / 65;
@@ -1139,13 +1162,13 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
         camPos.y += (Math.random() - 0.5) * 0.28 * k2;
       }
       camera.position.lerp(camPos, 0.14);
-      camera.lookAt(p.x, p.y + 0.7, p.z);
+      camera.lookAt(px, py + 0.7, pz);
       if (s.dizzy > 35) {
         camera.rotation.z += Math.sin(s.t * 2.6) * 0.075 * ((s.dizzy - 35) / 65);
       }
 
-      sun.position.set(p.x + 10, p.y + 18, p.z + 8);
-      sun.target.position.set(p.x, p.y, p.z);
+      sun.position.set(px + 10, py + 18, pz + 8);
+      sun.target.position.set(px, py, pz);
 
       renderer.render(scene, camera);
     };
@@ -1159,7 +1182,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
         acc -= STEP;
         if (stepLogic()) return;
       }
-      draw(dt);
+      draw(dt, acc / STEP);
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);

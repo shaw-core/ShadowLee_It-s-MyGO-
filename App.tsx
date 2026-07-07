@@ -22,7 +22,6 @@ type AfterDialogue = 'ENTER_LEVEL' | 'ADVANCE' | 'GALLERY';
 
 const SKIN_STORAGE_KEY = 'dousha3d_skin';
 const BGM_STORAGE_KEY = 'dousha_bgm';
-const ANOMALY_STORAGE_KEY = 'dousha_sys_anomaly';
 // BGM 选项：0..N-1 单曲循环，N = 顺序播放，N+1 = 关闭
 const BGM_SEQ = BGM_TRACKS.length;
 const BGM_OFF = BGM_TRACKS.length + 1;
@@ -35,9 +34,6 @@ const loadBgmSel = (): number => {
     if (v >= 0 && v < BGM_OPTION_COUNT) return v;
   } catch { /* ignore */ }
   return 0;
-};
-const loadAnomaly = (): boolean => {
-  try { return localStorage.getItem(ANOMALY_STORAGE_KEY) === '1'; } catch { return false; }
 };
 const loadSkin = (): SkinId => {
   try {
@@ -77,10 +73,11 @@ const App: React.FC = () => {
   const bgmSelRef = useRef(bgmSel);
   const seqIndexRef = useRef(0);
   const [matrixHack, setMatrixHack] = useState(false);
-  const [sysAnomaly, setSysAnomaly] = useState<boolean>(loadAnomaly);
+  const [sysAnomaly, setSysAnomaly] = useState(false); // 仅在完成隐藏结局后的当次会话出现
   const [anomalyAcked, setAnomalyAcked] = useState(false);
   const [skinFlow, setSkinFlow] = useState<'MENU' | 'START3D'>('MENU');
   useEffect(() => { bgmSelRef.current = bgmSel; }, [bgmSel]);
+  useEffect(() => { try { localStorage.removeItem('dousha_sys_anomaly'); } catch { /* ignore */ } }, []);
   useEffect(() => {
     if (!audioRef.current) {
       const initial = bgmSel < BGM_TRACKS.length ? bgmSel : 0;
@@ -379,7 +376,7 @@ const App: React.FC = () => {
           onExit={(hacked) => {
             if (hacked) {
               setSysAnomaly(true);
-              try { localStorage.setItem(ANOMALY_STORAGE_KEY, '1'); } catch { /* ignore */ }
+              setAnomalyAcked(false);
             }
             if (isMusicPlaying && bgmSelRef.current !== BGM_OFF) audioRef.current?.play().catch(() => {});
             setGameState(GameState.MENU);
