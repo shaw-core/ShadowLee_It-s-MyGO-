@@ -109,7 +109,7 @@ export const EVENTS3D: Record<string, YuriEvent> = {
         text: '（愣了一下，别开视线）……笨蛋。走了。',
         choices: [{ id: 'c', text: '（她的耳朵红了。记下来了。）', nextNodeId: 'end' }] },
       'end': { id: 'end', speakerName: '李豆沙',
-        text: '（第一张纸条，收好了。第二层的路，还很长。）',
+        text: '（第一张纸条，收好了。第二层的路，还很长。……纸条的边角上，还印着两个小小的字母。）',
         choices: [{ id: 'c', text: '……', nextNodeId: null }] },
     },
   },

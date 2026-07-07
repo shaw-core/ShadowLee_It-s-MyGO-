@@ -39,6 +39,8 @@ export interface Entity3D {
   // FADE 专用：
   fadePeriod?: number;                   // 一个显隐周期（秒）
   fadeOffset?: number;                   // 相位偏移（弧度）
+  // 二周目专属实体（一周目不生成）
+  ngPlusOnly?: boolean;
 }
 
 export interface Level3D {
@@ -99,6 +101,7 @@ export const LEVELS3D: Level3D[] = [
       P('l1_side1', 20, 2.1, 6.5, 2.4, 2.4),
       P('l1_side2', 20, 2.7, 10, 2.4, 2.4),
       PAGE('page3d_ch1', 20, 4.0, 10),
+      { ...TX('l1_ng1', 20, 5.4, 10, '捡到一张小纸条：「试着在键盘上敲下 s h a d o w」'), ngPlusOnly: true },
       // 现实/线框交替踏板
       P('l1_a1', 25.5, 2.0, 0, 2.6, 2.6, 'REAL'),
       P('l1_a2', 29, 2.4, 0, 2.6, 2.6, 'MANGA'),
@@ -300,7 +303,6 @@ export const LEVELS3D: Level3D[] = [
       P('l5_page_p', 53.5, 5.6, -12, 2.6, 2.6),
       PAGE('page3d_ch5', 53.5, 6.9, -12),
       P('l5_page_r', 53.5, 5.6, -7, 2.6, 2.6),
-      SH('shard3d_l5_4', 51, 7.2, 0),
       // ---- 加长段：全机制汇演 ----
       FD('l5_f1', 53, 5.6, -2.5, 2.6, 2.6, 2.6, 0),
       FD('l5_f2', 56.5, 5.9, -2.5, 2.6, 2.6, 2.6, Math.PI),

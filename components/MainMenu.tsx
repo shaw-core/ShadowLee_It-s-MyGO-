@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BookHeart, Star, X, ImageOff, Sparkles, Shirt, Camera, Music, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 import { SPECIAL_CG_URL } from '../constants';
 import { GAME_VERSION } from '../version';
@@ -19,17 +19,58 @@ interface MainMenuProps {
   onPrevBgm?: () => void;
   onNextBgm?: () => void;
   systemAnomaly?: boolean;     // 入侵隐藏终端后：世界系统异常
+  onDismissAnomaly?: () => void;
 }
 
 const MainMenu: React.FC<MainMenuProps> = ({
   onStart2D, onStart3D, onGallery, onSkinSelect, onSecretEnding,
   isGameCleared, is3DCleared, isFullCompletion, hasSpecialCG,
-  onSpecialCG3D, onCheatUnlock, bgmName, onPrevBgm, onNextBgm, systemAnomaly,
+  onSpecialCG3D, onCheatUnlock, bgmName, onPrevBgm, onNextBgm, systemAnomaly, onDismissAnomaly,
 }) => {
   const [showCG, setShowCG] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [clickCount, setClickCount] = useState(0);
-  const [anomalyDismissed, setAnomalyDismissed] = useState(false);
+  // 系统故障杂音（警告显示期间循环播放，替代 BGM）
+  useEffect(() => {
+    if (!systemAnomaly) return;
+    let ctx: AudioContext | null = null;
+    let glitchTimer: ReturnType<typeof setInterval> | null = null;
+    try {
+      ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const master = ctx.createGain();
+      master.gain.value = 0.5;
+      master.connect(ctx.destination);
+      // 白噪声底
+      const len = ctx.sampleRate * 2;
+      const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * 0.6;
+      const noise = ctx.createBufferSource();
+      noise.buffer = buf; noise.loop = true;
+      const band = ctx.createBiquadFilter();
+      band.type = 'bandpass'; band.frequency.value = 900; band.Q.value = 0.6;
+      const noiseGain = ctx.createGain(); noiseGain.gain.value = 0.16;
+      noise.connect(band); band.connect(noiseGain); noiseGain.connect(master);
+      noise.start();
+      // 间歇性电子故障哔啵
+      glitchTimer = setInterval(() => {
+        if (!ctx || Math.random() > 0.6) return;
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = Math.random() > 0.5 ? 'sawtooth' : 'square';
+        o.frequency.setValueAtTime(120 + Math.random() * 2200, ctx.currentTime);
+        o.frequency.exponentialRampToValueAtTime(40 + Math.random() * 400, ctx.currentTime + 0.09);
+        g.gain.setValueAtTime(0.14, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+        o.connect(g); g.connect(master);
+        o.start(); o.stop(ctx.currentTime + 0.12);
+      }, 280);
+    } catch { /* ignore */ }
+    return () => {
+      if (glitchTimer) clearInterval(glitchTimer);
+      try { ctx?.close(); } catch { /* ignore */ }
+    };
+  }, [systemAnomaly]);
 
   const handleTitleClick = () => {
     setClickCount(prev => prev + 1);
@@ -42,7 +83,16 @@ const MainMenu: React.FC<MainMenuProps> = ({
   return (
     <div className="w-full h-screen flex flex-col items-center bg-[#FEF7CD] text-blue-900 relative overflow-y-auto font-pixel">
       <style>{`
-        @keyframes anomaly-flicker { 0%, 92%, 100% { opacity: 1; } 94% { opacity: 0.55; } 96% { opacity: 1; } 98% { opacity: 0.7; } }
+        @keyframes anomaly-glitch {
+          0%, 86%, 100% { transform: translate(0, 0) skewX(0); opacity: 1; filter: none; }
+          87% { transform: translate(-6px, 2px) skewX(-4deg); opacity: 0.65; filter: hue-rotate(90deg); }
+          88.5% { transform: translate(5px, -2px) skewX(3deg); opacity: 1; }
+          90% { transform: translate(0, 0); opacity: 0.3; }
+          91% { opacity: 1; }
+          94% { transform: translate(3px, 1px) skewX(2deg); opacity: 0.8; filter: saturate(3); }
+          95.5% { transform: translate(0, 0); opacity: 1; filter: none; }
+        }
+        @keyframes anomaly-scan { 0% { top: -10%; } 100% { top: 110%; } }
       `}</style>
 
       {/* 经典背景装饰 */}
@@ -53,22 +103,6 @@ const MainMenu: React.FC<MainMenuProps> = ({
       </div>
 
       <div className="z-10 flex flex-col items-center my-auto py-10 w-full px-4">
-        {/* 世界系统异常（入侵隐藏终端后出现） */}
-        {systemAnomaly && !anomalyDismissed && (
-          <div className="relative w-full max-w-md mb-5 border-4 border-red-500 bg-red-50/95 text-red-600 px-4 py-3 retro-border shadow-[4px_4px_0_0_#dc2626]"
-               style={{ animation: 'anomaly-flicker 3.2s linear infinite' }}>
-            <button onClick={() => setAnomalyDismissed(true)}
-              className="absolute top-1 right-1 text-red-400 hover:text-red-600 p-1"><X size={14} /></button>
-            <div className="flex items-center font-bold text-sm mb-1">
-              <AlertTriangle size={16} className="mr-2 animate-pulse" /> WORLD SYSTEM WARNING
-            </div>
-            <div className="font-mono text-[11px] leading-relaxed">
-              世界完整性校验失败 · 检测到未授权访问痕迹<br />
-              [P.A.N.D.A.] 监察进程已被唤醒 —— 该事件将被记录
-            </div>
-          </div>
-        )}
-
         {/* 大标题（经典样式） */}
         <div className="text-center select-none space-y-4">
           <h1
@@ -168,6 +202,37 @@ const MainMenu: React.FC<MainMenuProps> = ({
           <Sparkles size={32} fill="currentColor" />
           {!isFullCompletion && <span className="text-[10px] mt-1 font-bold">???</span>}
         </button>
+      )}
+
+      {/* 世界系统异常：全屏警告（入侵隐藏终端后出现） */}
+      {systemAnomaly && (
+        <div className="fixed inset-0 z-[90] bg-black/75 flex items-center justify-center p-6">
+          <div className="relative w-full max-w-xl border-4 border-red-500 bg-red-950/80 backdrop-blur-sm text-red-400 px-8 py-8 overflow-hidden"
+               style={{ animation: 'anomaly-glitch 2.4s linear infinite', boxShadow: '0 0 40px rgba(220,38,38,0.55), inset 0 0 30px rgba(220,38,38,0.2)' }}>
+            {/* 扫描线 */}
+            <div className="absolute left-0 w-full h-8 bg-red-500/10 pointer-events-none"
+                 style={{ animation: 'anomaly-scan 2.8s linear infinite' }} />
+            <div className="absolute inset-0 pointer-events-none opacity-30"
+                 style={{ background: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.4) 0px, rgba(0,0,0,0.4) 1px, transparent 1px, transparent 3px)' }} />
+
+            <div className="flex items-center justify-center font-bold text-2xl md:text-3xl mb-4 tracking-wider"
+                 style={{ textShadow: '2px 0 0 rgba(0,255,255,0.5), -2px 0 0 rgba(255,0,0,0.7)' }}>
+              <AlertTriangle size={32} className="mr-3 animate-pulse" /> WORLD SYSTEM WARNING
+            </div>
+            <div className="font-mono text-sm md:text-base leading-loose text-center text-red-300">
+              世界完整性校验失败<br />
+              检测到未授权访问痕迹 —— 权限等级：TVHEAD_ADMIN<br />
+              [P.A.N.D.A.] 监察进程已被唤醒<br />
+              <span className="opacity-60 text-xs">该事件将被记录，并同步至更高一层。</span>
+            </div>
+            <div className="mt-6 flex justify-center">
+              <button onClick={onDismissAnomaly}
+                className="border-2 border-red-400 px-8 py-2 font-mono font-bold tracking-[0.3em] text-red-300 hover:bg-red-500 hover:text-black transition-colors">
+                [ 确认 ]
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 特殊CG弹窗 */}

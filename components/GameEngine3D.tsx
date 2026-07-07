@@ -147,6 +147,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
   const [pandaToast, setPandaToast] = useState('');
   const togglePandaRef = useRef<() => void>(() => {});
   const cacheAnchorRef = useRef<() => void>(() => {});
+  const resetWorldRef = useRef<() => void>(() => {});
   const [cacheUsed, setCacheUsed] = useState(false);
 
   // ---- 外观能力 ----
@@ -205,11 +206,20 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
     s.collected.clear();
     s.isDead = false;
     s.dizzy = 0;
+    s.stunT = 0;
+    s.airJumpOk = false;
+    s.shieldOk = true;
+    s.invulnT = 0;
+    s.cacheUsed = false;
     s.t = 0; s.deaths = 0;
     s.startTime = Date.now();
     layerRef.current = Layer.REAL;
+    resetWorldRef.current();
     setCollectedItems(new Set());
     setDizzyLevel(0);
+    setStunned(false);
+    setShieldUsed(false);
+    setCacheUsed(false);
     setCheckpointHit(false);
     setCurrentLayer(Layer.REAL);
     applyLayerRef.current(Layer.REAL);
@@ -333,6 +343,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
     };
 
     for (const e of levelConfig.entities) {
+      if (e.ngPlusOnly && !isGameCleared) continue; // 二周目专属实体
       const g = new THREE.Group();
 
       if (e.type === 'PLATFORM' || e.type === 'MOVER') {
@@ -413,6 +424,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
         scene.add(g);
         ents.push(rt);
         (rt as any).setActivated = () => { panda.setActivated(); };
+        (rt as any).resetVisual = () => { panda.reset(); };
       } else if (e.type === 'GOAL' && levelConfig.id === 5) {
         // 终章：世界的裂缝（没对齐的接缝，发着呼吸般的光）
         const crackMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
@@ -587,6 +599,33 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
       setPandaToast('⚡ 缓存锚点已部署！倒下后会从这里醒来');
       setTimeout(() => setPandaToast(''), 2600);
       particles.burst(new THREE.Vector3(s.p.x, s.p.y, s.p.z), 0x7db4ff, 26, 2.5, 3);
+    };
+
+    // 重开关卡：把世界所有可变状态归位（修复存档点失效 bug 的核心）
+    resetWorldRef.current = () => {
+      for (const r of ents) {
+        if (r.ent.type === 'CHECKPOINT') {
+          r.activated = false;
+          (r as any).resetVisual?.();
+        }
+        if (r.ent.type === 'TRIGGER') r.fired = false;
+        if (r.ent.shiftTo) {
+          r.shiftStart = undefined;
+          r.shiftDone = false;
+          r.x = r.base.x; r.y = r.base.y; r.z = r.base.z;
+          r.group.position.copy(r.base);
+        }
+        if (r.ent.type === 'CRUMBLE') {
+          r.off = false;
+          r.crumbleAt = undefined;
+          r.fallAt = undefined;
+          r.group.position.set(r.x, r.y, r.z);
+          const m = (r as any).crMat as THREE.MeshStandardMaterial | undefined;
+          if (m) m.opacity = 1;
+        }
+        if (r.ent.type === 'FADE') r.off = false;
+      }
+      cacheMarker.visible = false;
     };
 
     // ---- 室友姐 NPC：先走一步，在终点门旁等你（她不受次元影响，始终是彩色的） ----
@@ -1142,7 +1181,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
       });
       renderer.dispose();
     };
-  }, [levelConfig, skin]);
+  }, [levelConfig, skin, isGameCleared]);
 
   const pageCount = Array.from(collectedItems).filter((id: string) => id.startsWith('page')).length;
   const shardCount = Array.from(collectedItems).filter((id: string) => !id.startsWith('page')).length;

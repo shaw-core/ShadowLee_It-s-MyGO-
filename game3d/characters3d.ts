@@ -568,7 +568,7 @@ export const buildPandaWitch = (): CharacterRig => {
 };
 
 // ============ 存档点小熊猫（坐姿，右脸蓝星；激活后围巾变粉、头顶亮星） ============
-export const buildCheckpointPanda = (): { group: THREE.Group; setActivated: () => void } => {
+export const buildCheckpointPanda = (): { group: THREE.Group; setActivated: () => void; reset: () => void } => {
   const group = new THREE.Group();
   const s = 0.62; // 比主角小一圈
   const inner = new THREE.Group();
@@ -633,6 +633,10 @@ export const buildCheckpointPanda = (): { group: THREE.Group; setActivated: () =
     setActivated: () => {
       scarfMat.color.setHex(0xf472b6);
       topStar.visible = true;
+    },
+    reset: () => {
+      scarfMat.color.setHex(0x93a6c4);
+      topStar.visible = false;
     },
   };
 };

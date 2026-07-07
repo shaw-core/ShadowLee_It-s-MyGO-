@@ -6,11 +6,12 @@ import { SKINS, SkinId, buildCharacter, buildPandaWitch } from '../game3d/charac
 interface SkinSelectProps {
   currentSkin: SkinId;
   novusUnlocked: boolean;
+  recommendSkin2?: boolean;   // 二周目开局：推荐电视头小豆
   onConfirm: (skin: SkinId) => void;
   onBack: () => void;
 }
 
-const SkinSelect: React.FC<SkinSelectProps> = ({ currentSkin, novusUnlocked, onConfirm, onBack }) => {
+const SkinSelect: React.FC<SkinSelectProps> = ({ currentSkin, novusUnlocked, recommendSkin2, onConfirm, onBack }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [pandaRevealed, setPandaRevealed] = useState(false);
   const PANDA_ENTRY = {
@@ -20,7 +21,11 @@ const SkinSelect: React.FC<SkinSelectProps> = ({ currentSkin, novusUnlocked, onC
     features: ['？？？？？？', '在游戏中输入 shadow，即可变身为魔法熊猫', '来历不明——似乎与某种神秘的力量有关', '它不属于任何人，也无法被选择'],
   };
   const displayList = pandaRevealed ? [...SKINS, PANDA_ENTRY] : SKINS;
-  const [index, setIndex] = useState(Math.max(0, SKINS.findIndex(s => s.id === currentSkin)));
+  const [index, setIndex] = useState(
+    recommendSkin2
+      ? Math.max(0, SKINS.findIndex(s => s.id === 'skin2'))
+      : Math.max(0, SKINS.findIndex(s => s.id === currentSkin))
+  );
   const skin = displayList[Math.min(index, displayList.length - 1)];
   const isLocked = skin.id === 'skinNovus' && !novusUnlocked;
   const isPanda = skin.id === 'panda';
@@ -118,7 +123,12 @@ const SkinSelect: React.FC<SkinSelectProps> = ({ currentSkin, novusUnlocked, onC
       </button>
 
       <div className="my-auto flex flex-col items-center py-16">
-      <h1 className="text-2xl md:text-3xl font-bold text-pink-500 drop-shadow-[2px_2px_0_#fff] mb-4">选择外观</h1>
+      <h1 className="text-2xl md:text-3xl font-bold text-pink-500 drop-shadow-[2px_2px_0_#fff] mb-2">选择外观</h1>
+      {recommendSkin2 && (
+        <p className="mb-3 px-4 py-1.5 bg-white border-2 border-red-400 text-sm font-bold text-red-600 animate-pulse">
+          ★ 推荐选择：<span className="font-extrabold underline">电视头小豆</span> —— 二周目的隐藏结局需要她
+        </p>
+      )}
 
       <div className="flex items-center gap-4 md:gap-8">
         <button onClick={prev}

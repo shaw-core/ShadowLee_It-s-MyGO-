@@ -78,6 +78,8 @@ const App: React.FC = () => {
   const seqIndexRef = useRef(0);
   const [matrixHack, setMatrixHack] = useState(false);
   const [sysAnomaly, setSysAnomaly] = useState<boolean>(loadAnomaly);
+  const [anomalyAcked, setAnomalyAcked] = useState(false);
+  const [skinFlow, setSkinFlow] = useState<'MENU' | 'START3D'>('MENU');
   useEffect(() => { bgmSelRef.current = bgmSel; }, [bgmSel]);
   useEffect(() => {
     if (!audioRef.current) {
@@ -143,9 +145,14 @@ const App: React.FC = () => {
 
   const handleStart3D = () => {
     tryPlayMusic();
+    // 先选角色（防止忘记选），确认后再进序章
+    setSkinFlow('START3D');
+    setGameState(GameState.SKIN_SELECT);
+  };
+
+  const actuallyStart3D = () => {
     setMode('3d');
     setCurrentLevelIndex(0);
-    // 后编开场：先播序章对话（推门后世界变成 3D），再进第1关
     afterDialogueRef.current = 'ENTER_LEVEL';
     setActiveEvent(EVENTS3D['event_prologue']);
     setGameState(GameState.DIALOGUE);
@@ -158,7 +165,12 @@ const App: React.FC = () => {
   const handleSkinConfirm = (s: SkinId) => {
     setSkin(s);
     try { localStorage.setItem(SKIN_STORAGE_KEY, s); } catch { /* ignore */ }
-    setGameState(GameState.MENU);
+    if (skinFlow === 'START3D') {
+      setSkinFlow('MENU');
+      actuallyStart3D();
+    } else {
+      setGameState(GameState.MENU);
+    }
   };
 
   const handleGalleryOpen = () => {
@@ -268,6 +280,16 @@ const App: React.FC = () => {
     }
   };
 
+  const anomalyVisible = gameState === GameState.MENU && sysAnomaly && !anomalyAcked;
+  useEffect(() => {
+    if (anomalyVisible) {
+      audioRef.current?.pause();
+    } else if (gameState === GameState.MENU && isMusicPlaying && bgmSelRef.current !== BGM_OFF) {
+      audioRef.current?.play().catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anomalyVisible, gameState]);
+
   const isFullCompletion = inventory.size >= TOTAL_2D + TOTAL_3D;
   // 特殊CG：在前编第7关收集到实体后解锁展示
   const hasSpecialCG = inventory.has('special_cg');
@@ -296,7 +318,8 @@ const App: React.FC = () => {
           bgmName={bgmOptionName(bgmSel)}
           onPrevBgm={() => selectBgm(bgmSel - 1)}
           onNextBgm={() => selectBgm(bgmSel + 1)}
-          systemAnomaly={sysAnomaly}
+          systemAnomaly={anomalyVisible}
+          onDismissAnomaly={() => setAnomalyAcked(true)}
         />
       )}
 
@@ -304,8 +327,9 @@ const App: React.FC = () => {
         <SkinSelect
           currentSkin={effectiveSkin}
           novusUnlocked={novusUnlocked}
+          recommendSkin2={skinFlow === 'START3D' && cleared3D}
           onConfirm={handleSkinConfirm}
-          onBack={() => setGameState(GameState.MENU)}
+          onBack={() => { setSkinFlow('MENU'); setGameState(GameState.MENU); }}
         />
       )}
 

@@ -15,6 +15,15 @@ interface GalleryProps {
 const PAGES_2D = ['page_ch1', 'page_ch2', 'page_ch3', 'page_ch4', 'page_ch5'];
 const PAGES_3D = ['page3d_ch1', 'page3d_ch2', 'page3d_ch3', 'page3d_ch4', 'page3d_ch5'];
 
+// 草稿页边角的密文（第5页是解法）
+const PAGE_CIPHER: Record<string, string> = {
+  'page3d_ch1': 'C · C',
+  'page3d_ch2': 'J · G',
+  'page3d_ch3': 'G · B',
+  'page3d_ch4': 'G · A',
+  'page3d_ch5': '解法：A 是 0。往后数。',
+};
+
 const Gallery: React.FC<GalleryProps> = ({ affectionData, collectedPages, onBack, onReplayEvent }) => {
 
   const getEventForPage = (pageId: string) => {
@@ -22,7 +31,7 @@ const Gallery: React.FC<GalleryProps> = ({ affectionData, collectedPages, onBack
         ?? Object.values(EVENTS3D).find(e => e.requiredPageId === pageId);
   };
 
-  const renderPageGrid = (pageIds: string[]) => (
+  const renderPageGrid = (pageIds: string[], showCipher = false) => (
     <div className="grid grid-cols-5 gap-3">
       {pageIds.map((pageId, idx) => {
         const isCollected = collectedPages.includes(pageId);
@@ -47,6 +56,11 @@ const Gallery: React.FC<GalleryProps> = ({ affectionData, collectedPages, onBack
                 <div className="absolute bottom-1 right-1 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
                   <PlayCircle className="text-pink-500 fill-white" size={20} />
                 </div>
+                {showCipher && PAGE_CIPHER[pageId] && (
+                  <div className="absolute bottom-1 left-1 z-20 font-mono text-[8px] leading-tight text-red-500/80 bg-white/70 px-1 max-w-[90%]">
+                    {PAGE_CIPHER[pageId]}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="w-full h-full flex items-center justify-center text-gray-300 font-pixel text-2xl">
@@ -110,7 +124,8 @@ const Gallery: React.FC<GalleryProps> = ({ affectionData, collectedPages, onBack
            <h3 className="flex items-center text-lg font-bold text-pink-500 mt-6 mb-2">
              <Box className="mr-2" size={18} /> 后编 · 多边形篇
            </h3>
-           {renderPageGrid(PAGES_3D)}
+           <p className="text-[10px] text-red-400/70 font-mono mb-1">（草稿页的边角，好像印着字母……）</p>
+           {renderPageGrid(PAGES_3D, true)}
         </div>
 
       </div>

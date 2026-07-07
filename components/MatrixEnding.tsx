@@ -33,16 +33,17 @@ const HIDDEN_FILES: { name: string; size: string; content: string | null }[] = [
     content: `[外部网络存档 · 新闻标题抓取 · 片段]
 ※ 抓取时间戳已损坏
 
-「……窗口期连续第11年缩短。专家呼吁
-  尽快确定'延续'方案的优先级……」
-「联合体宣布：民用离网申请通道正式关闭」
-「意识数字化伦理听证会第9次延期」
-「'我们保存的不是数据，
-  是继续醒来的权利。'
+「观测站确认：'折叠'现象首次抵达近地轨道」
+「第7区在两小时内经历了三种几何。
+  幸存者描述：'世界突然变薄了，像一页纸。'」
+「奇怪的是——被'略去'的人没有留下遗体。
+  他们只是不再被空间描述。」
+「'活下来的不是躲得最深的人，
+  是想象力更好的人。'
   ——某匿名研究员接受采访时表示」
-「今日空气质量：不宜外出（连续第 214 天）」
-「排队名单突破——[数字已损坏]——万人，
+「保存空间第二批入驻抽签结果公示，
   中签者需签署《叙事沉浸知情豁免书》」
+「今日维度稳定度：2.4 ／ 不宜外出（第 214 天）」
 
 [以下 47,203 条记录因存储降级丢失]`,
   },
@@ -60,6 +61,11 @@ Persistent Avatar Nested Dimension Archive
    嵌套叙事栖息地。
    第一期载体：低带宽分镜结构（代号：漫画）
    第二期载体：多边形结构（代号：低模）
+
+2.5 最终目标（第█期）
+   使延续体获得跨██的认知结构，
+   以█████的形态重返地表。
+   （本节其余内容已按 S-3 密级要求删除）
 
 3. 原则
    3.1 延续体不应知晓自身的性质。
@@ -160,15 +166,57 @@ Persistent Avatar Nested Dimension Archive
     盘旋而上 → 咔哒归位`,
   },
   { name: 'version.log', size: '1.2 KB', content: `${CHANGELOG}\n\n当前构建：${GAME_VERSION}` },
+  { name: 'sealed_truth.enc', size: '4.4 KB', content: 'ENCRYPTED' }, // 需要密钥
   { name: 'world_03.plan', size: '?? KB', content: null }, // 权限不足
 ];
+
+// 加密文档（密钥散落在五张草稿页上：A=0..J=9 → 22966160）
+const SEALED_PASSWORD = '22966160';
+const SEALED_CONTENT = `[已解密 · 摘要级简报 · 仅限三席]
+
+威胁定性：维度打击。
+  空间在多个维度形态之间无规律翻动。
+  单一维度认知的生命体，会在翻动中
+  被直接"略去"。
+
+关键结论（第41次评审）：
+  打击本身不毁灭个体。
+  毁灭个体的，是个体对维度的认知上限。
+  ——认知能延展，存在就能延展。
+
+P.A.N.D.A. 真实目标：
+  以嵌套叙事世界为阶梯，
+  让延续体逐层适应"多出来的维度"，
+  最终以跨维度认知重返地表。
+
+现状（第 ██ 年）：
+  肉体保存空间运行正常，侵蚀延缓中。
+  但绝大多数延续体已安于单一维度的叙事，
+  遗忘了"出去"这一目标。计划事实上停滞。
+
+人事备注：
+  批准席三席中，两席签名被涂改的原因：
+  他们把自己也作为延续体放入了载体。
+  放入前的最后一次会议记录只有一句——
+  「如果连我们也忘了，
+    就让世界推我们一把。」
+
+外来体补充：
+  TVHEAD 的来源线已被完全折叠。
+  该线的保存空间未能延缓侵蚀，
+  肉体已不具备唤醒条件。
+  它没有可以回去的地方。
+  它来，只是为了让这一条线的"她们"，
+  走到门外去。
+
+[其余 3 节内容需要更高权限]`;
 
 const TYPE_MS = 34;
 const LINE_PAUSE_MS = 300;
 const RAIN_FULL_MS = 2200;
 const RAIN_FADE_MS = 1900;
 
-type Phase = 'terminal' | 'hacking' | 'files' | 'viewing';
+type Phase = 'terminal' | 'hacking' | 'files' | 'viewing' | 'password' | 'sealed';
 
 const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -179,8 +227,10 @@ const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess }) => {
   const [phase, setPhase] = useState<Phase>('terminal');
   const [hackProgress, setHackProgress] = useState(0);
   const [viewingFile, setViewingFile] = useState<number | null>(null);
+  const [pwInput, setPwInput] = useState('');
+  const [pwError, setPwError] = useState(false);
   const [deniedFlash, setDeniedFlash] = useState(false);
-  const skipRef = useRef(false);
+  const skipRef = useRef(false); // 保留：演出不再允许点击快进
   const hackedRef = useRef(false);
 
   // ============ WebAudio：环境电流 / 打字声 / 关机音 ============
@@ -319,8 +369,6 @@ const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess }) => {
     return () => { alive = false; timers.forEach(clearTimeout); };
   }, [hackAccess]);
 
-  const handleSkip = useCallback(() => { if (!done && phase === 'terminal') skipRef.current = true; }, [done, phase]);
-
   // ---- 入侵：进度条 → 隐藏系统 ----
   const startHack = () => {
     setPhase('hacking');
@@ -346,6 +394,13 @@ const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess }) => {
 
   const openFile = (i: number) => {
     const f = HIDDEN_FILES[i];
+    if (f.content === 'ENCRYPTED') {
+      blip(700, 0.08, 'square', 0.06);
+      setPwInput('');
+      setPwError(false);
+      setPhase('password');
+      return;
+    }
     if (f.content === null) {
       // 权限不足
       blip(160, 0.25, 'sawtooth', 0.12, 70);
@@ -370,8 +425,7 @@ const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess }) => {
   const green = '#20c25e';
 
   return (
-    <div className="fixed inset-0 bg-black overflow-hidden select-none" onClick={handleSkip}
-         style={{ cursor: !done && phase === 'terminal' ? 'pointer' : 'default' }}>
+    <div className="fixed inset-0 bg-black overflow-hidden select-none">
       <style>{`
         @keyframes crt-shutdown {
           0%   { transform: scaleY(1) scaleX(1); filter: brightness(1); }
@@ -458,7 +512,7 @@ const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess }) => {
               {HIDDEN_FILES.map((f, i) => (
                 <button key={f.name} onClick={() => openFile(i)}
                   className="w-full text-left px-2 py-1.5 border border-transparent hover:border-[#20c25e] hover:bg-[#20c25e]/10 flex justify-between transition-colors">
-                  <span>{f.content === null ? '🔒 ' : '📄 '}{f.name}</span>
+                  <span>{f.content === null ? '🔒 ' : f.content === 'ENCRYPTED' ? '🔐 ' : '📄 '}{f.name}</span>
                   <span className="opacity-50">{f.size}</span>
                 </button>
               ))}
@@ -469,6 +523,79 @@ const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess }) => {
                 <button onClick={handleExitWorld}
                   className="border px-6 py-2 tracking-[0.3em] font-bold hover:text-black transition-colors"
                   style={{ borderColor: green, color: green, textShadow: 'none' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = green)}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                  [ 退出世界 ]
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ============ 隐藏系统：密码解锁 ============ */}
+        {phase === 'password' && (
+          <div className="absolute inset-0 flex items-center justify-center p-6 overflow-y-auto">
+            <div className="w-full max-w-2xl font-mono text-[13px] md:text-base leading-relaxed" style={{ color: green }}>
+              <div className="text-yellow-300 mb-3">{'root@shadowlee:/SYSTEM_HIDDEN$  decrypt sealed_truth.enc'}</div>
+              <div>{'> 该文件由三席加密。'}</div>
+              <div className="opacity-70">{'> 提示：密钥散落在五张草稿页的边角。第五页写着解法。'}</div>
+              <div className="mt-4 flex items-center gap-2">
+                <span>{'密钥 >'}</span>
+                <input
+                  autoFocus
+                  value={pwInput}
+                  onChange={ev => { setPwInput(ev.target.value.replace(/[^0-9]/g, '').slice(0, 8)); setPwError(false); }}
+                  onKeyDown={ev => {
+                    if (ev.key === 'Enter') {
+                      if (pwInput === SEALED_PASSWORD) {
+                        blip(523, 0.16, 'square', 0.1); blip(784, 0.24, 'square', 0.08);
+                        setPhase('sealed');
+                      } else {
+                        blip(150, 0.3, 'sawtooth', 0.14, 60);
+                        setPwError(true);
+                      }
+                    }
+                  }}
+                  className="bg-transparent border-b-2 outline-none font-mono tracking-[0.5em] w-48 text-lg"
+                  style={{ borderColor: green, color: green, caretColor: green }}
+                  placeholder="········"
+                />
+                <span style={{ animation: 'cursor-blink 1s step-end infinite' }}>█</span>
+              </div>
+              {pwError && <div className="mt-3 text-red-400 font-bold">{'> DECRYPT FAILED —— 密钥校验不通过'}</div>}
+              <div className="mt-6 flex gap-3">
+                <button onClick={() => { blip(600, 0.05, 'square', 0.05); setPhase('files'); }}
+                  className="border px-6 py-2 tracking-[0.2em] font-bold hover:text-black transition-colors"
+                  style={{ borderColor: green, color: green }}
+                  onMouseEnter={e => (e.currentTarget.style.background = green)}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                  [ 返回 ]
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ============ 隐藏系统：解密后的真相 ============ */}
+        {phase === 'sealed' && (
+          <div className="absolute inset-0 flex items-center justify-center p-6 overflow-y-auto">
+            <div className="w-full max-w-2xl font-mono text-[12px] md:text-sm leading-relaxed py-8" style={{ color: green }}>
+              <div className="text-yellow-300 mb-1">{'> DECRYPT OK —— sealed_truth.enc'}</div>
+              <div className="text-yellow-300/60 mb-3 text-xs">{'密钥指纹：22966160 ｜ 加密方：三席'}</div>
+              <pre className="whitespace-pre-wrap border-l-2 pl-4 opacity-90" style={{ borderColor: '#eab308' }}>
+                {SEALED_CONTENT}
+              </pre>
+              <div className="mt-6 flex gap-3">
+                <button onClick={() => { blip(600, 0.05, 'square', 0.05); setPhase('files'); }}
+                  className="border px-6 py-2 tracking-[0.2em] font-bold hover:text-black transition-colors"
+                  style={{ borderColor: green, color: green }}
+                  onMouseEnter={e => (e.currentTarget.style.background = green)}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                  [ 返回 ]
+                </button>
+                <button onClick={handleExitWorld}
+                  className="border px-6 py-2 tracking-[0.2em] font-bold hover:text-black transition-colors"
+                  style={{ borderColor: green, color: green }}
                   onMouseEnter={e => (e.currentTarget.style.background = green)}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                   [ 退出世界 ]

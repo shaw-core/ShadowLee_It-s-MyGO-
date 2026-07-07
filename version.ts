@@ -1,5 +1,5 @@
 // 版本号与构建历史（每次迭代交付时更新）
-export const GAME_VERSION = 'v0.10.0';
+export const GAME_VERSION = 'v0.11.0';
 
 export const CHANGELOG = `PROJECT SHADOWLEE —— build history
 ──────────────────────────────────────
@@ -17,4 +17,7 @@ v0.8.0  Kimo熊主线剧情/矩阵终端结局/世界重排机制
 v0.9.0  关卡全面加长/弹跳菇·闪烁·碎裂平台/缓存锚点/
         BGM系统/隐藏终端系统
 v0.10.0 隐藏档案重写(P.A.N.D.A.计划)/BGM关闭与顺序播放/
-        终端音量提升/主页配色回退/系统异常警告  <== CURRENT BUILD`;
+        终端音量提升/主页配色回退/系统异常警告
+v0.11.0 存档点重置修复/草稿页解密系统(sealed_truth.enc)/
+        维度打击暗线/开局选角流程/二周目shadow纸条/
+        全屏故障警告与杂音               <== CURRENT BUILD`;
