@@ -3,8 +3,28 @@ import { GAME_VERSION, CHANGELOG } from '../version';
 
 interface MatrixEndingProps {
   onExit: (hacked: boolean) => void;
-  hackAccess?: boolean;   // 使用电视头小豆通关：持有 TVHEAD_ADMIN 权限碎片
+  hackAccess?: boolean;        // 使用电视头小豆通关：持有 TVHEAD_ADMIN 权限碎片
+  collectedPages?: string[];   // 已收集的草稿页（解密时随时查看）
 }
+
+// 草稿页边角的密文（与图鉴一致）
+const PAGE_CIPHER: [string, string, string][] = [
+  ['page3d_ch1', '第1页', '边角字母：C · C'],
+  ['page3d_ch2', '第2页', '边角字母：J · G'],
+  ['page3d_ch3', '第3页', '边角字母：G · B'],
+  ['page3d_ch4', '第4页', '边角字母：G · A'],
+  ['page3d_ch5', '第5页', '边角小字：「A 是 0。往后数。」'],
+];
+const buildDraftPagesFile = (collected: string[]): string => {
+  const lines = PAGE_CIPHER.map(([id, label, cipher]) =>
+    collected.includes(id) ? `  ${label} …… ${cipher}` : `  ${label} …… [未持有]`);
+  return `[实体扫描 · 随身物品 · 草稿页]
+
+${lines.join('\n')}
+
+（扫描说明：字母印在纸页边角，
+  肉眼几乎不可见。扫描层可读。）`;
+};
 
 const TERMINAL_LINES = [
   '> connection to WORLD_02 [LOWPOLY] ......... lost',
@@ -172,44 +192,48 @@ Persistent Avatar Nested Dimension Archive
 
 // 加密文档（密钥散落在五张草稿页上：A=0..J=9 → 22966160）
 const SEALED_PASSWORD = '22966160';
-const SEALED_CONTENT = `[已解密 · 摘要级简报 · 仅限三席]
+const SEALED_CONTENT = `[解密成功 · 归档包 sealed_truth]
+包含 4 份记录。按时间排序。归档人：Kimo
 
-威胁定性：维度打击。
-  空间在多个维度形态之间无规律翻动。
-  单一维度认知的生命体，会在翻动中
-  被直接"略去"。
+── 记录一 · 第41次评审会议纪要（残段）──
 
-关键结论（第41次评审）：
-  打击本身不毁灭个体。
-  毁灭个体的，是个体对维度的认知上限。
-  ——认知能延展，存在就能延展。
+  席位甲：「它不摧毁任何东西。它只是
+    换了一种描述世界的方式。
+    跟不上新描述的，就不再被描述。」
+  席位乙：「所以问题从来不在掩体够不够深。」
+  Kimo ：「在想象力能走多远。」
 
-P.A.N.D.A. 真实目标：
-  以嵌套叙事世界为阶梯，
-  让延续体逐层适应"多出来的维度"，
-  最终以跨维度认知重返地表。
+  （后续 12 页缺失）
 
-现状（第 ██ 年）：
-  肉体保存空间运行正常，侵蚀延缓中。
-  但绝大多数延续体已安于单一维度的叙事，
-  遗忘了"出去"这一目标。计划事实上停滞。
+── 记录二 · 载体运行年报（摘要行）──
 
-人事备注：
-  批准席三席中，两席签名被涂改的原因：
-  他们把自己也作为延续体放入了载体。
-  放入前的最后一次会议记录只有一句——
-  「如果连我们也忘了，
-    就让世界推我们一把。」
+  第 3 年：延续体适应度 良好。越层意愿 87%
+  第 9 年：延续体适应度 良好。越层意愿 41%
+  第 ██ 年：延续体适应度 极佳。越层意愿 2.3%
 
-外来体补充：
-  TVHEAD 的来源线已被完全折叠。
-  该线的保存空间未能延缓侵蚀，
-  肉体已不具备唤醒条件。
-  它没有可以回去的地方。
-  它来，只是为了让这一条线的"她们"，
-  走到门外去。
+  备注栏只有一行手写小字：
+  「他们过得太幸福了。
+    这不是我们想要的那种失败。」
 
-[其余 3 节内容需要更高权限]`;
+── 记录三 · 保存空间夜间巡检（节选）──
+
+  ……第 0407 与 0408 号舱指标平稳。
+  两舱相邻，登记备注为同一批次：
+  「管理层特批 · 自愿入驻 · 关联入驻」。
+  入驻登记的落款处，两个名字
+  被同一支笔划掉了。旁边补着一句：
+  「从今天起，名字留在外面。」
+
+── 记录四 · 未署名通讯（单向 · 未送达）──
+
+  「这条线的舱体监测，昨天全部停了。
+    我知道这意味着什么。
+    别为我破例改规则——
+    把规则里那道缝，留给她们。」
+
+  （信号来源：无法解析的世界线校验和）
+
+[其余记录需要更高权限]`;
 
 const TYPE_MS = 34;
 const LINE_PAUSE_MS = 300;
@@ -218,7 +242,12 @@ const RAIN_FADE_MS = 1900;
 
 type Phase = 'terminal' | 'hacking' | 'files' | 'viewing' | 'password' | 'sealed';
 
-const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess }) => {
+const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess, collectedPages = [] }) => {
+  // 动态文件表：随身草稿页放在最上面，方便解谜
+  const files = React.useMemo(() => ([
+    { name: 'draft_pages.dat', size: '0.4 KB', content: buildDraftPagesFile(collectedPages) },
+    ...HIDDEN_FILES,
+  ]), [collectedPages]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [typed, setTyped] = useState<string[]>([]);
   const [currentLine, setCurrentLine] = useState('');
@@ -393,7 +422,7 @@ const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess }) => {
   };
 
   const openFile = (i: number) => {
-    const f = HIDDEN_FILES[i];
+    const f = files[i];
     if (f.content === 'ENCRYPTED') {
       blip(700, 0.08, 'square', 0.06);
       setPwInput('');
@@ -509,7 +538,7 @@ const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess }) => {
                  style={{ color: green, textShadow: '0 0 8px rgba(32,194,94,0.4)', animation: deniedFlash ? 'denied-shake 0.25s' : undefined }}>
               <div className="text-yellow-300 mb-1">{'root@shadowlee:/SYSTEM_HIDDEN$  ls -la'}</div>
               <div className="opacity-60 mb-3">{'权限等级：TVHEAD_ADMIN ｜ 该目录不属于任何一个世界'}</div>
-              {HIDDEN_FILES.map((f, i) => (
+              {files.map((f, i) => (
                 <button key={f.name} onClick={() => openFile(i)}
                   className="w-full text-left px-2 py-1.5 border border-transparent hover:border-[#20c25e] hover:bg-[#20c25e]/10 flex justify-between transition-colors">
                   <span>{f.content === null ? '🔒 ' : f.content === 'ENCRYPTED' ? '🔐 ' : '📄 '}{f.name}</span>
@@ -539,6 +568,12 @@ const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess }) => {
               <div className="text-yellow-300 mb-3">{'root@shadowlee:/SYSTEM_HIDDEN$  decrypt sealed_truth.enc'}</div>
               <div>{'> 该文件由三席加密。'}</div>
               <div className="opacity-70">{'> 提示：密钥散落在五张草稿页的边角。第五页写着解法。'}</div>
+              <div className="mt-3 border-l-2 pl-3 text-xs md:text-sm opacity-80 space-y-0.5" style={{ borderColor: green }}>
+                <div className="text-yellow-300/80">{'── 随身草稿页扫描 ──'}</div>
+                {PAGE_CIPHER.map(([id, label, cipher]) => (
+                  <div key={id}>{collectedPages.includes(id) ? `${label} …… ${cipher}` : `${label} …… [未持有]`}</div>
+                ))}
+              </div>
               <div className="mt-4 flex items-center gap-2">
                 <span>{'密钥 >'}</span>
                 <input
@@ -609,9 +644,9 @@ const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess }) => {
         {phase === 'viewing' && viewingFile !== null && (
           <div className="absolute inset-0 flex items-center justify-center p-6 overflow-y-auto">
             <div className="w-full max-w-2xl font-mono text-[12px] md:text-sm leading-relaxed" style={{ color: green }}>
-              <div className="text-yellow-300 mb-3">{`root@shadowlee:/SYSTEM_HIDDEN$  cat ${HIDDEN_FILES[viewingFile].name}`}</div>
+              <div className="text-yellow-300 mb-3">{`root@shadowlee:/SYSTEM_HIDDEN$  cat ${files[viewingFile].name}`}</div>
               <pre className="whitespace-pre-wrap border-l-2 pl-4 opacity-90" style={{ borderColor: green }}>
-                {HIDDEN_FILES[viewingFile].content}
+                {files[viewingFile].content}
               </pre>
               <div className="mt-6 flex gap-3">
                 <button onClick={() => { blip(600, 0.05, 'square', 0.05); setPhase('files'); setViewingFile(null); }}

@@ -373,6 +373,7 @@ const App: React.FC = () => {
       {gameState === GameState.MATRIX_ENDING && (
         <MatrixEnding
           hackAccess={matrixHack}
+          collectedPages={Array.from(inventory).filter((id: string) => id.startsWith('page3d_'))}
           onExit={(hacked) => {
             if (hacked) {
               setSysAnomaly(true);

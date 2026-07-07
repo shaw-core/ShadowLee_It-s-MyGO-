@@ -1,5 +1,5 @@
 // 版本号与构建历史（每次迭代交付时更新）
-export const GAME_VERSION = 'v0.11.3';
+export const GAME_VERSION = 'v0.11.4';
 
 export const CHANGELOG = `PROJECT SHADOWLEE —— build history
 ──────────────────────────────────────
@@ -26,4 +26,6 @@ v0.11.1 修复：系统异常警告改为隐藏结局完成后的
 v0.11.2 剧情视角修正：终章前两人不再使用系统术语，
         回档/锚点等概念由Kimo熊终章首次揭示
 v0.11.3 修复：渲染插值消除跳跃卡顿/
-        提示文字画布加宽并自动缩字防截断    <== CURRENT BUILD`;
+        提示文字画布加宽并自动缩字防截断
+v0.11.4 解密档案改写为四份记录残片（侧写化）/
+        终端内置随身草稿页查看器与密码页内嵌密文  <== CURRENT BUILD`;
