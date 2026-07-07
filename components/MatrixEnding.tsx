@@ -512,8 +512,8 @@ const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess, collect
 
         {/* ============ 终端主界面 ============ */}
         {(phase === 'terminal' || phase === 'hacking') && (
-          <div className="absolute inset-0 flex items-center justify-center p-6 overflow-y-auto">
-            <div className="w-full max-w-2xl font-mono text-[13px] md:text-base leading-relaxed" style={{ color: green, textShadow: '0 0 8px rgba(32,194,94,0.55)' }}>
+          <div className="absolute inset-0 flex p-6 overflow-y-auto">
+            <div className="w-full max-w-2xl m-auto py-6 font-mono text-[13px] md:text-base leading-relaxed" style={{ color: green, textShadow: '0 0 8px rgba(32,194,94,0.55)' }}>
               {typed.map((line, i) => (
                 <div key={i} className="whitespace-pre-wrap min-h-[1.4em]">{line}</div>
               ))}
@@ -565,8 +565,8 @@ const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess, collect
 
         {/* ============ 隐藏系统：文件列表 ============ */}
         {phase === 'files' && (
-          <div className="absolute inset-0 flex items-center justify-center p-6 overflow-y-auto">
-            <div className="w-full max-w-2xl font-mono text-[13px] md:text-base leading-relaxed"
+          <div className="absolute inset-0 flex p-6 overflow-y-auto">
+            <div className="w-full max-w-2xl m-auto py-6 font-mono text-[13px] md:text-base leading-relaxed"
                  style={{ color: green, textShadow: '0 0 8px rgba(32,194,94,0.4)', animation: deniedFlash ? 'denied-shake 0.25s' : undefined }}>
               <div className="text-yellow-300 mb-1">{'root@shadowlee:/SYSTEM_HIDDEN$  ls -la'}</div>
               <div className="opacity-60 mb-3">{'权限等级：TVHEAD_ADMIN ｜ 该目录不属于任何一个世界'}</div>
@@ -595,8 +595,8 @@ const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess, collect
 
         {/* ============ 隐藏系统：密码解锁 ============ */}
         {phase === 'password' && (
-          <div className="absolute inset-0 flex items-center justify-center p-6 overflow-y-auto">
-            <div className="w-full max-w-2xl font-mono text-[13px] md:text-base leading-relaxed" style={{ color: green }}>
+          <div className="absolute inset-0 flex p-6 overflow-y-auto">
+            <div className="w-full max-w-2xl m-auto py-6 font-mono text-[13px] md:text-base leading-relaxed" style={{ color: green }}>
               <div className="text-yellow-300 mb-3">{'root@shadowlee:/SYSTEM_HIDDEN$  decrypt sealed_truth.enc'}</div>
               <div>{'> 该文件由三席加密。'}</div>
               <div className="opacity-70">{'> 提示：密钥散落在五张草稿页的边角。第五页写着解法。'}</div>
@@ -645,8 +645,8 @@ const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess, collect
 
         {/* ============ 隐藏系统：解密后的真相 ============ */}
         {phase === 'sealed' && (
-          <div className="absolute inset-0 flex items-center justify-center p-6 overflow-y-auto">
-            <div className="w-full max-w-2xl font-mono text-[12px] md:text-sm leading-relaxed py-8" style={{ color: green }}>
+          <div className="absolute inset-0 flex p-6 overflow-y-auto">
+            <div className="w-full max-w-2xl m-auto py-6 font-mono text-[12px] md:text-sm leading-relaxed py-8" style={{ color: green }}>
               <div className="text-yellow-300 mb-1">{'> DECRYPT OK —— sealed_truth.enc'}</div>
               <div className="text-yellow-300/60 mb-3 text-xs">{'密钥指纹：22966160 ｜ 加密方：三席'}</div>
               <pre className="whitespace-pre-wrap border-l-2 pl-4 opacity-90" style={{ borderColor: '#eab308' }}>
@@ -674,8 +674,8 @@ const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess, collect
 
         {/* ============ 隐藏系统：查看文件 ============ */}
         {phase === 'viewing' && viewingFile !== null && (
-          <div className="absolute inset-0 flex items-center justify-center p-6 overflow-y-auto">
-            <div className="w-full max-w-2xl font-mono text-[12px] md:text-sm leading-relaxed" style={{ color: green }}>
+          <div className="absolute inset-0 flex p-6 overflow-y-auto">
+            <div className="w-full max-w-2xl m-auto py-6 font-mono text-[12px] md:text-sm leading-relaxed" style={{ color: green }}>
               <div className="text-yellow-300 mb-3">{`root@shadowlee:/SYSTEM_HIDDEN$  cat ${files[viewingFile].name}`}</div>
               <pre className="whitespace-pre-wrap border-l-2 pl-4 opacity-90" style={{ borderColor: green }}>
                 {files[viewingFile].content}

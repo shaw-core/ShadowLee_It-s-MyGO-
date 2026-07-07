@@ -1,5 +1,5 @@
 // 版本号与构建历史（每次迭代交付时更新）
-export const GAME_VERSION = 'v0.11.5';
+export const GAME_VERSION = 'v0.11.6';
 
 export const CHANGELOG = `PROJECT SHADOWLEE —— build history
 ──────────────────────────────────────
@@ -31,4 +31,6 @@ v0.11.4 解密档案改写为四份记录残片（侧写化）/
         终端内置随身草稿页查看器与密码页内嵌密文
 v0.11.5 解密档案替换为 LOG-SYS-A770 交叉比对卷宗
         （维度打击死因侧写/神经弹性年报/裂缝-09
-         覆写日志与被隐藏的音频留言）        <== CURRENT BUILD`;
+         覆写日志与被隐藏的音频留言）
+v0.11.6 修复：终端长文档顶部被裁切无法滚动查看
+        （flex居中改为margin:auto方案）      <== CURRENT BUILD`;
