@@ -1,5 +1,5 @@
 // 版本号与构建历史（每次迭代交付时更新）
-export const GAME_VERSION = 'v0.11.7';
+export const GAME_VERSION = 'v0.11.8';
 
 export const CHANGELOG = `PROJECT SHADOWLEE —— build history
 ──────────────────────────────────────
@@ -35,4 +35,7 @@ v0.11.5 解密档案替换为 LOG-SYS-A770 交叉比对卷宗
 v0.11.6 修复：终端长文档顶部被裁切无法滚动查看
         （flex居中改为margin:auto方案）
 v0.11.7 终端界面改为顶部对齐块级滚动布局，
-        彻底根治长文档顶部裁切              <== CURRENT BUILD`;
+        彻底根治长文档顶部裁切
+v0.11.8 第一章终关剧情重写（删除编造细节，
+        直接衔接第二章开场）/特殊CG右下角
+        to be continue......                <== CURRENT BUILD`;

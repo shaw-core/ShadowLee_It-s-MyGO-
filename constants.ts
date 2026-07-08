@@ -449,36 +449,36 @@ export const EVENTS: Record<string, YuriEvent> = {
       'start': {
         id: 'start',
         speakerName: '室友姐',
-        text: "（天台上，她背对着门口的光站着，手里拿着什么）来了？走之前，有个东西给你。",
+        text: "（天台的尽头，最后那扇门静静立着，门缝里透出微微发亮的光。她背对着光站着，手里拿着什么）来了？过去之前，有个东西给你。",
         choices: [{ id: 'c1', text: "（走过去）什么呀，神神秘秘的……", nextNodeId: 'gift' }]
       },
       'gift': {
         id: 'gift',
         speakerName: '室友姐',
-        text: "（递过来一张打印出来的照片——是你们俩贴着脸的合照，她还特意P了猫耳和熊猫耳）拿着。万一……门那边的世界会把记忆冲淡呢。",
+        text: "（递过来一张照片——是两个人贴着脸的合照）拿着。谁也不知道门后面是什么地方。带一张在身上，走到哪儿都记得，是和谁一起出发的。",
         choices: [
-          { id: 'c2a', text: "（接过来，眼眶有点热）你居然会P图？！", nextNodeId: 'tease' },
-          { id: 'c2s', text: "【直球】不需要照片。你这个人，我用整颗心记着。", affectionDelta: { charId: 'novus', amount: 50 }, nextNodeId: 'special', requiresClear: true }
+          { id: 'c2a', text: "（接过来，心口一热）……你什么时候拍的这张？！", nextNodeId: 'tease' },
+          { id: 'c2s', text: "【直球】照片我收下。但就算什么都不带——不管多久，我都会一直记得你。", affectionDelta: { charId: 'novus', amount: 50 }, nextNodeId: 'special', requiresClear: true }
         ],
         backgroundStyle: 'MANGA'
       },
       'tease': {
         id: 'tease',
         speakerName: '室友姐',
-        text: "废话，你直播间的表情包一半是我做的。……喜欢吗？",
-        choices: [{ id: 'c3', text: "（用力点头）最喜欢了！", affectionDelta: { charId: 'novus', amount: 15 }, nextNodeId: 'door' }]
+        text: "秘密。（她转头看向那扇门，光落在她侧脸上）收好了就走吧。门后面不管是什么，都得我们亲眼去看。",
+        choices: [{ id: 'c3', text: "（把照片贴身收好）嗯！", affectionDelta: { charId: 'novus', amount: 15 }, nextNodeId: 'door' }]
       },
       'special': {
         id: 'special',
         speakerName: '室友姐',
-        text: "（她愣住了，然后低下头笑了，把照片塞进你手心，指尖停留了两秒）……那这张就当备份。心和备份，我都要。",
-        choices: [{ id: 'c3', text: "（握紧照片）嗯！都给你！", nextNodeId: 'door' }]
+        text: "（她愣了一下，然后低下头笑了，把照片轻轻按进你手心）……那这张就当个凭证。哪天你敢忘，我就拿它提醒你。",
+        choices: [{ id: 'c3', text: "（用力点头）一言为定！", nextNodeId: 'door' }]
       },
       'door': {
         id: 'door',
         speakerName: '李豆沙',
         text: "（门的光漫过天台，谁都没有说话。她的手在身侧，很轻地张开了一点。）",
-        choices: [{ id: 'e', text: "（装作不经意地，把手递了过去。→ 后编待续）", nextNodeId: null }]
+        choices: [{ id: 'e', text: "（装作不经意地把手递过去。两个人一起，推开了门。→ 第二章待续）", nextNodeId: null }]
       }
     }
   }

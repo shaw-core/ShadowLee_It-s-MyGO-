@@ -251,8 +251,14 @@ const MainMenu: React.FC<MainMenuProps> = ({
                 <p className="text-xs mt-2 font-mono text-red-400">请确保根目录下存在:<br />special_cg.png</p>
               </div>
             ) : (
-              <img src={SPECIAL_CG_URL} alt="Special CG" onError={() => setImgError(true)}
-                className="w-full h-auto max-h-[75vh] object-contain pixelated" style={{ imageRendering: 'pixelated' }} />
+              <>
+                <img src={SPECIAL_CG_URL} alt="Special CG" onError={() => setImgError(true)}
+                  className="w-full h-auto max-h-[75vh] object-contain pixelated" style={{ imageRendering: 'pixelated' }} />
+                <span className="absolute bottom-4 right-5 text-white font-bold italic text-sm md:text-lg pointer-events-none"
+                      style={{ textShadow: '0 2px 4px rgba(0,0,0,0.9), 0 0 12px rgba(0,0,0,0.6)' }}>
+                  to be continue......
+                </span>
+              </>
             )}
             <p className="text-center mt-4 text-white font-bold text-xl drop-shadow-[0_2px_0_rgba(0,0,0,1)]">
               感谢游玩！室守星沙是真实的！
