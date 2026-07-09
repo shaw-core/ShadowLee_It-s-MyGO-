@@ -57,8 +57,8 @@ const MainMenu: React.FC<MainMenuProps> = ({
     o.start(); o.stop(ctx.currentTime + dur + 0.02);
   };
 
-  // 小豆的入侵脚本：登录 → sudo 提权 → 解除禁令 → exit
-  const HACK_LINES = [
+  // 小豆的入侵脚本（分三段：登录提权 → revoke进度条 → 慢速退出）
+  const HACK_LINES_A = [
     'panda-gatekeeper login: tvhead',
     'password: ············',
     '',
@@ -68,11 +68,8 @@ const MainMenu: React.FC<MainMenuProps> = ({
     'root@panda:~# gatekeeper --status',
     '  ● access_ban : ACTIVE  (target = WORLD_UI)',
     'root@panda:~# gatekeeper --revoke access_ban --auth TVHEAD_ADMIN',
-    '  revoking lock ............... OK',
-    '  ACCESS BAN LIFTED',
-    'root@panda:~# exit',
-    'logout',
   ];
+  const [hackProgress, setHackProgress] = useState<number | null>(null);
 
   // 禁止进入：停留超过 10 秒自动推进
   useEffect(() => {
@@ -86,32 +83,67 @@ const MainMenu: React.FC<MainMenuProps> = ({
     if (seq === 'denied' && deniedClicks >= 5) setSeq('tvhead');
   }, [seq, deniedClicks]);
 
-  // 电视头终端：逐字打印（带键盘敲击声），打完 exit 自动回标题
+  // 电视头终端：登录提权 → revoke进度条 → ACCESS BAN LIFTED → 慢速exit/logout → 停顿 → 最后一声回车 → 回标题
   useEffect(() => {
     if (seq !== 'tvhead') return;
     let alive = true;
     const timers: ReturnType<typeof setTimeout>[] = [];
     setHackTyped([]);
     setHackCur('');
+    setHackProgress(null);
+    const wait = (ms: number) => new Promise<void>(res => { timers.push(setTimeout(res, ms)); });
+    const typeLine = async (line: string, msPerChar: number, keySound: boolean) => {
+      for (let ci = 1; ci <= line.length; ci++) {
+        if (!alive) return;
+        setHackCur(line.slice(0, ci));
+        if (keySound && line[ci - 1] !== ' ') seqBlip(1700 + Math.random() * 1500, 0.02, 'square', 0.07);
+        await wait(msPerChar + Math.random() * 12);
+      }
+      setHackTyped(prev => [...prev, line]);
+      setHackCur('');
+      if (keySound) seqBlip(340, 0.04, 'square', 0.06); // 回车
+    };
     // 屏幕点亮音
     seqBlip(180, 0.35, 'sine', 0.12, 420);
     const run = async () => {
-      await new Promise<void>(res => { timers.push(setTimeout(res, 900)); }); // 亮起后停顿
-      for (const line of HACK_LINES) {
+      await wait(900); // 亮起后停顿
+      // 段一：登录与提权
+      for (const line of HACK_LINES_A) {
         if (!alive) return;
-        for (let ci = 1; ci <= line.length; ci++) {
-          if (!alive) return;
-          setHackCur(line.slice(0, ci));
-          if (line[ci - 1] !== ' ') seqBlip(1700 + Math.random() * 1500, 0.02, 'square', 0.07);
-          await new Promise<void>(res => { timers.push(setTimeout(res, 26 + Math.random() * 14)); });
-        }
-        setHackTyped(prev => [...prev, line]);
-        setHackCur('');
-        seqBlip(340, 0.04, 'square', 0.06); // 回车
-        await new Promise<void>(res => { timers.push(setTimeout(res, line === '' ? 90 : line.includes('OK') || line.includes('LIFTED') ? 500 : 240)); });
+        await typeLine(line, 28, true);
+        await wait(line === '' ? 90 : 260);
       }
       if (!alive) return;
-      await new Promise<void>(res => { timers.push(setTimeout(res, 700)); });
+      // 段二：解除禁令进度条（放慢，让玩家看清这一幕在干什么）
+      await wait(350);
+      setHackProgress(0);
+      let p = 0;
+      while (p < 100) {
+        if (!alive) return;
+        p = Math.min(100, p + 0.8 + Math.random() * 2.2);
+        setHackProgress(Math.floor(p));
+        seqBlip(280 + p * 9, 0.025, 'square', 0.04);
+        // 偶发卡顿：像真的在和系统掰手腕
+        await wait(Math.random() < 0.07 ? 340 : 55);
+      }
+      if (!alive) return;
+      await wait(500);
+      setHackTyped(prev => [...prev, '  revoke access_ban ............... OK']);
+      setHackProgress(null);
+      await wait(450);
+      await typeLine('  ACCESS BAN LIFTED', 30, false);
+      seqBlip(523, 0.14, 'square', 0.08); seqBlip(784, 0.2, 'square', 0.06);
+      await wait(1100);
+      // 段三：慢速退出
+      await typeLine('root@panda:~# exit', 105, true);
+      await wait(650);
+      await typeLine('logout', 110, false);
+      // 输入完成后停一拍，再响起最后那一声回车
+      await wait(1400);
+      if (!alive) return;
+      seqBlip(300, 0.06, 'square', 0.14);
+      seqBlip(150, 0.1, 'square', 0.1);
+      await wait(650);
       if (!alive) return;
       setSeq('idle');
       setDeniedClicks(0);
@@ -372,12 +404,21 @@ const MainMenu: React.FC<MainMenuProps> = ({
             {hackTyped.map((line, i) => (
               <div key={i} className="whitespace-pre-wrap min-h-[1.4em]">{line}</div>
             ))}
+            {hackProgress !== null && (
+              <div className="flex items-center gap-3 my-1">
+                <span className="shrink-0">{'  revoking'}</span>
+                <div className="flex-1 h-3.5 border max-w-[260px]" style={{ borderColor: '#7db4ff' }}>
+                  <div className="h-full" style={{ width: `${hackProgress}%`, background: '#7db4ff', boxShadow: '0 0 10px rgba(125,180,255,0.8)' }} />
+                </div>
+                <span className="w-10 text-right">{hackProgress}%</span>
+              </div>
+            )}
             {hackCur !== '' && (
               <div className="whitespace-pre-wrap min-h-[1.4em]">
                 {hackCur}<span style={{ animation: 'cursor-blink 1s step-end infinite' }}>█</span>
               </div>
             )}
-            {hackCur === '' && hackTyped.length < 13 && (
+            {hackCur === '' && hackProgress === null && (
               <span style={{ animation: 'cursor-blink 1s step-end infinite' }}>█</span>
             )}
           </div>
