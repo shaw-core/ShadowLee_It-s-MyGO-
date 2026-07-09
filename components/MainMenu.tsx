@@ -30,8 +30,12 @@ const MainMenu: React.FC<MainMenuProps> = ({
   const [showCG, setShowCG] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [clickCount, setClickCount] = useState(0);
-  // 隐藏结局后的标题页演出：warning确认 → 禁止访问 → 电视头闪现 → 屏幕破碎 → 复原
-  const [seq, setSeq] = useState<'idle' | 'denied' | 'tvhead' | 'shatter'>('idle');
+  // 隐藏结局后的标题页演出：warning确认 → 禁止进入(点5次或停留10秒)
+  // → 电视头亮起 → 蓝色终端 sudo 提权解除禁令 → exit 回标题
+  const [seq, setSeq] = useState<'idle' | 'denied' | 'tvhead'>('idle');
+  const [deniedClicks, setDeniedClicks] = useState(0);
+  const [hackTyped, setHackTyped] = useState<string[]>([]);
+  const [hackCur, setHackCur] = useState('');
   const seqCtxRef = React.useRef<AudioContext | null>(null);
   const ensureSeqCtx = () => {
     if (!seqCtxRef.current) {
@@ -52,48 +56,71 @@ const MainMenu: React.FC<MainMenuProps> = ({
     o.connect(g); g.connect(ctx.destination);
     o.start(); o.stop(ctx.currentTime + dur + 0.02);
   };
-  const seqNoiseBurst = (dur: number, gain = 0.4) => {
-    const ctx = ensureSeqCtx();
-    if (!ctx) return;
-    const len = Math.floor(ctx.sampleRate * dur);
-    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
-    const src = ctx.createBufferSource(); src.buffer = buf;
-    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 800;
-    const g = ctx.createGain(); g.gain.value = gain;
-    src.connect(hp); hp.connect(g); g.connect(ctx.destination);
-    src.start();
-  };
 
-  // 演出时间轴
+  // 小豆的入侵脚本：登录 → sudo 提权 → 解除禁令 → exit
+  const HACK_LINES = [
+    'panda-gatekeeper login: tvhead',
+    'password: ············',
+    '',
+    'tvhead@panda:~$ sudo -i',
+    '[sudo] password for tvhead: ············',
+    '',
+    'root@panda:~# gatekeeper --status',
+    '  ● access_ban : ACTIVE  (target = WORLD_UI)',
+    'root@panda:~# gatekeeper --revoke access_ban --auth TVHEAD_ADMIN',
+    '  revoking lock ............... OK',
+    '  ACCESS BAN LIFTED',
+    'root@panda:~# exit',
+    'logout',
+  ];
+
+  // 禁止进入：停留超过 10 秒自动推进
   useEffect(() => {
-    if (seq === 'idle') return;
+    if (seq !== 'denied') return;
+    const t = setTimeout(() => setSeq('tvhead'), 10000);
+    return () => clearTimeout(t);
+  }, [seq]);
+
+  // 禁止进入：点击超过 5 次推进
+  useEffect(() => {
+    if (seq === 'denied' && deniedClicks >= 5) setSeq('tvhead');
+  }, [seq, deniedClicks]);
+
+  // 电视头终端：逐字打印（带键盘敲击声），打完 exit 自动回标题
+  useEffect(() => {
+    if (seq !== 'tvhead') return;
+    let alive = true;
     const timers: ReturnType<typeof setTimeout>[] = [];
-    let keyTimer: ReturnType<typeof setInterval> | null = null;
-    if (seq === 'denied') {
-      seqBlip(90, 0.5, 'sawtooth', 0.18, 40);
-      timers.push(setTimeout(() => setSeq('tvhead'), 2300));
-    } else if (seq === 'tvhead') {
-      // 高速键盘敲击声
-      keyTimer = setInterval(() => {
-        seqBlip(1700 + Math.random() * 1600, 0.02, 'square', 0.09);
-        if (Math.random() < 0.12) seqBlip(320, 0.045, 'square', 0.1); // 空格重击
-      }, 52);
-      timers.push(setTimeout(() => setSeq('shatter'), 3600));
-    } else if (seq === 'shatter') {
-      seqNoiseBurst(0.4, 0.5);
-      seqBlip(2600, 0.3, 'triangle', 0.12, 300);
-      timers.push(setTimeout(() => seqBlip(1900, 0.25, 'triangle', 0.08, 200), 120));
-      timers.push(setTimeout(() => seqBlip(1400, 0.3, 'triangle', 0.06, 150), 260));
-      timers.push(setTimeout(() => {
-        setSeq('idle');
-        onDismissAnomaly?.();
-        try { seqCtxRef.current?.close(); } catch { /* ignore */ }
-        seqCtxRef.current = null;
-      }, 1250));
-    }
-    return () => { timers.forEach(clearTimeout); if (keyTimer) clearInterval(keyTimer); };
+    setHackTyped([]);
+    setHackCur('');
+    // 屏幕点亮音
+    seqBlip(180, 0.35, 'sine', 0.12, 420);
+    const run = async () => {
+      await new Promise<void>(res => { timers.push(setTimeout(res, 900)); }); // 亮起后停顿
+      for (const line of HACK_LINES) {
+        if (!alive) return;
+        for (let ci = 1; ci <= line.length; ci++) {
+          if (!alive) return;
+          setHackCur(line.slice(0, ci));
+          if (line[ci - 1] !== ' ') seqBlip(1700 + Math.random() * 1500, 0.02, 'square', 0.07);
+          await new Promise<void>(res => { timers.push(setTimeout(res, 26 + Math.random() * 14)); });
+        }
+        setHackTyped(prev => [...prev, line]);
+        setHackCur('');
+        seqBlip(340, 0.04, 'square', 0.06); // 回车
+        await new Promise<void>(res => { timers.push(setTimeout(res, line === '' ? 90 : line.includes('OK') || line.includes('LIFTED') ? 500 : 240)); });
+      }
+      if (!alive) return;
+      await new Promise<void>(res => { timers.push(setTimeout(res, 700)); });
+      if (!alive) return;
+      setSeq('idle');
+      setDeniedClicks(0);
+      onDismissAnomaly?.();
+      try { seqCtxRef.current?.close(); } catch { /* ignore */ }
+      seqCtxRef.current = null;
+    };
+    run();
+    return () => { alive = false; timers.forEach(clearTimeout); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seq]);
   // 系统故障杂音（警告显示期间循环播放，替代 BGM）
@@ -159,25 +186,13 @@ const MainMenu: React.FC<MainMenuProps> = ({
           95.5% { transform: translate(0, 0); opacity: 1; filter: none; }
         }
         @keyframes anomaly-scan { 0% { top: -10%; } 100% { top: 110%; } }
-        @keyframes tv-flicker {
-          0%, 100% { opacity: 1; filter: drop-shadow(0 0 28px rgba(125,180,255,0.8)); transform: scale(1); }
-          8% { opacity: 0.4; transform: scale(1.01) translateX(3px); }
-          10% { opacity: 1; }
-          34% { opacity: 0.85; filter: drop-shadow(0 0 46px rgba(125,180,255,1)); transform: scale(1.03); }
-          52% { opacity: 0.3; transform: scale(0.99) translateX(-4px); }
-          54% { opacity: 1; }
-          77% { filter: drop-shadow(0 0 60px rgba(125,180,255,1)); transform: scale(1.05); }
+        @keyframes tv-on {
+          0% { opacity: 0; transform: scale(0.94); filter: drop-shadow(0 0 0 rgba(125,180,255,0)); }
+          100% { opacity: 1; transform: scale(1); filter: drop-shadow(0 0 26px rgba(125,180,255,0.7)); }
         }
-        @keyframes shard-fly {
-          0% { transform: translate(0, 0) rotate(0deg); opacity: 0.95; }
-          100% { transform: translate(var(--tx), var(--ty)) rotate(var(--rot)); opacity: 0; }
-        }
-        @keyframes crack-flash { 0% { opacity: 0; } 8% { opacity: 1; } 30% { opacity: 0.75; } 100% { opacity: 0; } }
-        @keyframes screen-shake {
-          0%, 100% { transform: translate(0, 0); }
-          15% { transform: translate(-10px, 6px); } 30% { transform: translate(9px, -5px); }
-          45% { transform: translate(-7px, -6px); } 60% { transform: translate(6px, 5px); }
-          75% { transform: translate(-4px, 2px); } 90% { transform: translate(3px, -2px); }
+        @keyframes tv-breathe {
+          0%, 100% { filter: drop-shadow(0 0 18px rgba(125,180,255,0.5)); }
+          50% { filter: drop-shadow(0 0 40px rgba(125,180,255,0.9)); }
         }
       `}</style>
 
@@ -323,28 +338,27 @@ const MainMenu: React.FC<MainMenuProps> = ({
 
       {/* ===== 隐藏结局后的标题页演出 ===== */}
       {seq === 'denied' && (
-        <div className="fixed inset-0 z-[95] bg-black flex flex-col items-center justify-center select-none">
+        <div className="fixed inset-0 z-[95] bg-black flex flex-col items-center justify-center select-none cursor-default"
+             onClick={() => setDeniedClicks(c => c + 1)}>
           <div className="text-red-600 font-bold text-6xl md:text-8xl tracking-[0.2em]"
-               style={{ animation: 'anomaly-glitch 1.6s linear infinite', textShadow: '3px 0 0 rgba(0,255,255,0.4), -3px 0 0 rgba(255,0,0,0.6)' }}>
-            禁止访问
+               style={{ animation: 'anomaly-glitch 2.2s linear infinite', textShadow: '3px 0 0 rgba(0,255,255,0.4), -3px 0 0 rgba(255,0,0,0.6)' }}>
+            禁止进入
           </div>
           <div className="mt-6 font-mono text-red-800 text-sm tracking-[0.5em]">ACCESS RESTRICTED</div>
         </div>
       )}
 
       {seq === 'tvhead' && (
-        <div className="fixed inset-0 z-[95] bg-black flex items-center justify-center select-none overflow-hidden">
-          <div className="absolute inset-0 opacity-15 pointer-events-none"
-               style={{ background: 'repeating-linear-gradient(0deg, rgba(125,180,255,0.25) 0px, rgba(125,180,255,0.25) 1px, transparent 1px, transparent 4px)' }} />
-          {/* 电视头表情：突然出现，闪烁发光 */}
-          <div className="relative w-72 h-52 md:w-96 md:h-64 bg-[#15181f] rounded-xl border-4 border-[#3a4152]"
-               style={{ animation: 'tv-flicker 0.9s linear infinite' }}>
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-6">
-              <div className="flex gap-10">
-                <div className="w-16 h-4 md:w-20 md:h-5 rounded-full bg-[#7db4ff]" />
-                <div className="w-16 h-4 md:w-20 md:h-5 rounded-full bg-[#7db4ff]" />
+        <div className="fixed inset-0 z-[95] bg-black flex flex-col items-center justify-center select-none overflow-hidden px-4">
+          {/* 电视头：亮起后轻微呼吸光 */}
+          <div className="relative w-60 h-40 md:w-72 md:h-48 bg-[#15181f] rounded-xl border-4 border-[#3a4152] shrink-0"
+               style={{ animation: 'tv-on 0.7s ease-out forwards, tv-breathe 3s ease-in-out 0.7s infinite' }}>
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-5">
+              <div className="flex gap-8">
+                <div className="w-14 h-3.5 md:w-16 md:h-4 rounded-full bg-[#7db4ff]" />
+                <div className="w-14 h-3.5 md:w-16 md:h-4 rounded-full bg-[#7db4ff]" />
               </div>
-              <svg width="90" height="34" viewBox="0 0 90 34" className="md:scale-125">
+              <svg width="76" height="28" viewBox="0 0 90 34">
                 <path d="M 8 8 A 16 16 0 0 0 44 8" fill="none" stroke="#7db4ff" strokeWidth="8" strokeLinecap="round" />
                 <path d="M 46 8 A 16 16 0 0 0 82 8" fill="none" stroke="#7db4ff" strokeWidth="8" strokeLinecap="round" />
               </svg>
@@ -352,45 +366,22 @@ const MainMenu: React.FC<MainMenuProps> = ({
             <div className="absolute inset-0 rounded-lg pointer-events-none opacity-30"
                  style={{ background: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.5) 0px, rgba(0,0,0,0.5) 1px, transparent 1px, transparent 3px)' }} />
           </div>
-        </div>
-      )}
-
-      {seq === 'shatter' && (
-        <div className="fixed inset-0 z-[95] select-none overflow-hidden pointer-events-none"
-             style={{ animation: 'screen-shake 0.5s linear' }}>
-          {/* 白光爆闪 */}
-          <div className="absolute inset-0 bg-white" style={{ animation: 'crack-flash 1.1s ease-out forwards' }} />
-          {/* 裂纹 */}
-          <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none"
-               style={{ animation: 'crack-flash 1.15s ease-out forwards' }}>
-            {[
-              'M50,50 L12,8', 'M50,50 L88,14', 'M50,50 L95,58', 'M50,50 L74,96',
-              'M50,50 L26,92', 'M50,50 L4,62', 'M50,50 L38,4', 'M50,50 L96,34',
-              'M50,50 L60,2', 'M50,50 L8,38',
-            ].map((d, i) => (
-              <path key={i} d={d} stroke="rgba(30,40,60,0.9)" strokeWidth="0.45" fill="none" />
+          {/* 小豆的蓝色终端 */}
+          <div className="w-full max-w-xl mt-6 font-mono text-[12px] md:text-sm leading-relaxed text-[#7db4ff]"
+               style={{ textShadow: '0 0 8px rgba(125,180,255,0.5)' }}>
+            {hackTyped.map((line, i) => (
+              <div key={i} className="whitespace-pre-wrap min-h-[1.4em]">{line}</div>
             ))}
-            {['M50,50 L30,26 L20,14', 'M50,50 L68,70 L82,84', 'M50,50 L66,32 L80,22'].map((d, i) => (
-              <path key={'b' + i} d={d} stroke="rgba(30,40,60,0.7)" strokeWidth="0.3" fill="none" />
-            ))}
-          </svg>
-          {/* 玻璃碎片飞散 */}
-          {Array.from({ length: 12 }).map((_, i) => {
-            const ang = (i / 12) * Math.PI * 2 + 0.3;
-            const dist = 55 + (i % 4) * 22;
-            return (
-              <div key={i}
-                className="absolute left-1/2 top-1/2 border border-white/50 bg-white/15"
-                style={{
-                  width: 26 + (i % 3) * 22, height: 30 + ((i + 1) % 3) * 20,
-                  clipPath: 'polygon(50% 0, 100% 68%, 12% 100%)',
-                  ['--tx' as string]: `${Math.cos(ang) * dist}vmin`,
-                  ['--ty' as string]: `${Math.sin(ang) * dist + 18}vmin`,
-                  ['--rot' as string]: `${(i % 2 === 0 ? 1 : -1) * (140 + i * 30)}deg`,
-                  animation: `shard-fly ${0.9 + (i % 3) * 0.15}s cubic-bezier(0.2, 0.6, 0.6, 1) forwards`,
-                }} />
-            );
-          })}
+            {hackCur !== '' && (
+              <div className="whitespace-pre-wrap min-h-[1.4em]">
+                {hackCur}<span style={{ animation: 'cursor-blink 1s step-end infinite' }}>█</span>
+              </div>
+            )}
+            {hackCur === '' && hackTyped.length < 13 && (
+              <span style={{ animation: 'cursor-blink 1s step-end infinite' }}>█</span>
+            )}
+          </div>
+          <style>{`@keyframes cursor-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }`}</style>
         </div>
       )}
 
