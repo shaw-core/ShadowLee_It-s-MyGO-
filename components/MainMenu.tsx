@@ -30,6 +30,72 @@ const MainMenu: React.FC<MainMenuProps> = ({
   const [showCG, setShowCG] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [clickCount, setClickCount] = useState(0);
+  // 隐藏结局后的标题页演出：warning确认 → 禁止访问 → 电视头闪现 → 屏幕破碎 → 复原
+  const [seq, setSeq] = useState<'idle' | 'denied' | 'tvhead' | 'shatter'>('idle');
+  const seqCtxRef = React.useRef<AudioContext | null>(null);
+  const ensureSeqCtx = () => {
+    if (!seqCtxRef.current) {
+      try { seqCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)(); } catch { /* ignore */ }
+    }
+    return seqCtxRef.current;
+  };
+  const seqBlip = (freq: number, dur: number, type: OscillatorType = 'square', gain = 0.1, slideTo?: number) => {
+    const ctx = ensureSeqCtx();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    const o = ctx.createOscillator(); const g = ctx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, ctx.currentTime);
+    if (slideTo !== undefined) o.frequency.exponentialRampToValueAtTime(Math.max(20, slideTo), ctx.currentTime + dur);
+    g.gain.setValueAtTime(gain, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(); o.stop(ctx.currentTime + dur + 0.02);
+  };
+  const seqNoiseBurst = (dur: number, gain = 0.4) => {
+    const ctx = ensureSeqCtx();
+    if (!ctx) return;
+    const len = Math.floor(ctx.sampleRate * dur);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 800;
+    const g = ctx.createGain(); g.gain.value = gain;
+    src.connect(hp); hp.connect(g); g.connect(ctx.destination);
+    src.start();
+  };
+
+  // 演出时间轴
+  useEffect(() => {
+    if (seq === 'idle') return;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    let keyTimer: ReturnType<typeof setInterval> | null = null;
+    if (seq === 'denied') {
+      seqBlip(90, 0.5, 'sawtooth', 0.18, 40);
+      timers.push(setTimeout(() => setSeq('tvhead'), 2300));
+    } else if (seq === 'tvhead') {
+      // 高速键盘敲击声
+      keyTimer = setInterval(() => {
+        seqBlip(1700 + Math.random() * 1600, 0.02, 'square', 0.09);
+        if (Math.random() < 0.12) seqBlip(320, 0.045, 'square', 0.1); // 空格重击
+      }, 52);
+      timers.push(setTimeout(() => setSeq('shatter'), 3600));
+    } else if (seq === 'shatter') {
+      seqNoiseBurst(0.4, 0.5);
+      seqBlip(2600, 0.3, 'triangle', 0.12, 300);
+      timers.push(setTimeout(() => seqBlip(1900, 0.25, 'triangle', 0.08, 200), 120));
+      timers.push(setTimeout(() => seqBlip(1400, 0.3, 'triangle', 0.06, 150), 260));
+      timers.push(setTimeout(() => {
+        setSeq('idle');
+        onDismissAnomaly?.();
+        try { seqCtxRef.current?.close(); } catch { /* ignore */ }
+        seqCtxRef.current = null;
+      }, 1250));
+    }
+    return () => { timers.forEach(clearTimeout); if (keyTimer) clearInterval(keyTimer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seq]);
   // 系统故障杂音（警告显示期间循环播放，替代 BGM）
   useEffect(() => {
     if (!systemAnomaly) return;
@@ -93,6 +159,26 @@ const MainMenu: React.FC<MainMenuProps> = ({
           95.5% { transform: translate(0, 0); opacity: 1; filter: none; }
         }
         @keyframes anomaly-scan { 0% { top: -10%; } 100% { top: 110%; } }
+        @keyframes tv-flicker {
+          0%, 100% { opacity: 1; filter: drop-shadow(0 0 28px rgba(125,180,255,0.8)); transform: scale(1); }
+          8% { opacity: 0.4; transform: scale(1.01) translateX(3px); }
+          10% { opacity: 1; }
+          34% { opacity: 0.85; filter: drop-shadow(0 0 46px rgba(125,180,255,1)); transform: scale(1.03); }
+          52% { opacity: 0.3; transform: scale(0.99) translateX(-4px); }
+          54% { opacity: 1; }
+          77% { filter: drop-shadow(0 0 60px rgba(125,180,255,1)); transform: scale(1.05); }
+        }
+        @keyframes shard-fly {
+          0% { transform: translate(0, 0) rotate(0deg); opacity: 0.95; }
+          100% { transform: translate(var(--tx), var(--ty)) rotate(var(--rot)); opacity: 0; }
+        }
+        @keyframes crack-flash { 0% { opacity: 0; } 8% { opacity: 1; } 30% { opacity: 0.75; } 100% { opacity: 0; } }
+        @keyframes screen-shake {
+          0%, 100% { transform: translate(0, 0); }
+          15% { transform: translate(-10px, 6px); } 30% { transform: translate(9px, -5px); }
+          45% { transform: translate(-7px, -6px); } 60% { transform: translate(6px, 5px); }
+          75% { transform: translate(-4px, 2px); } 90% { transform: translate(3px, -2px); }
+        }
       `}</style>
 
       {/* 经典背景装饰 */}
@@ -205,7 +291,7 @@ const MainMenu: React.FC<MainMenuProps> = ({
       )}
 
       {/* 世界系统异常：全屏警告（入侵隐藏终端后出现） */}
-      {systemAnomaly && (
+      {systemAnomaly && seq === 'idle' && (
         <div className="fixed inset-0 z-[90] bg-black/75 flex items-center justify-center p-6">
           <div className="relative w-full max-w-xl border-4 border-red-500 bg-red-950/80 backdrop-blur-sm text-red-400 px-8 py-8 overflow-hidden"
                style={{ animation: 'anomaly-glitch 2.4s linear infinite', boxShadow: '0 0 40px rgba(220,38,38,0.55), inset 0 0 30px rgba(220,38,38,0.2)' }}>
@@ -226,12 +312,85 @@ const MainMenu: React.FC<MainMenuProps> = ({
               <span className="opacity-60 text-xs">该事件将被记录，并同步至更高一层。</span>
             </div>
             <div className="mt-6 flex justify-center">
-              <button onClick={onDismissAnomaly}
+              <button onClick={() => { ensureSeqCtx(); setSeq('denied'); }}
                 className="border-2 border-red-400 px-8 py-2 font-mono font-bold tracking-[0.3em] text-red-300 hover:bg-red-500 hover:text-black transition-colors">
                 [ 确认 ]
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ===== 隐藏结局后的标题页演出 ===== */}
+      {seq === 'denied' && (
+        <div className="fixed inset-0 z-[95] bg-black flex flex-col items-center justify-center select-none">
+          <div className="text-red-600 font-bold text-6xl md:text-8xl tracking-[0.2em]"
+               style={{ animation: 'anomaly-glitch 1.6s linear infinite', textShadow: '3px 0 0 rgba(0,255,255,0.4), -3px 0 0 rgba(255,0,0,0.6)' }}>
+            禁止访问
+          </div>
+          <div className="mt-6 font-mono text-red-800 text-sm tracking-[0.5em]">ACCESS RESTRICTED</div>
+        </div>
+      )}
+
+      {seq === 'tvhead' && (
+        <div className="fixed inset-0 z-[95] bg-black flex items-center justify-center select-none overflow-hidden">
+          <div className="absolute inset-0 opacity-15 pointer-events-none"
+               style={{ background: 'repeating-linear-gradient(0deg, rgba(125,180,255,0.25) 0px, rgba(125,180,255,0.25) 1px, transparent 1px, transparent 4px)' }} />
+          {/* 电视头表情：突然出现，闪烁发光 */}
+          <div className="relative w-72 h-52 md:w-96 md:h-64 bg-[#15181f] rounded-xl border-4 border-[#3a4152]"
+               style={{ animation: 'tv-flicker 0.9s linear infinite' }}>
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-6">
+              <div className="flex gap-10">
+                <div className="w-16 h-4 md:w-20 md:h-5 rounded-full bg-[#7db4ff]" />
+                <div className="w-16 h-4 md:w-20 md:h-5 rounded-full bg-[#7db4ff]" />
+              </div>
+              <svg width="90" height="34" viewBox="0 0 90 34" className="md:scale-125">
+                <path d="M 8 8 A 16 16 0 0 0 44 8" fill="none" stroke="#7db4ff" strokeWidth="8" strokeLinecap="round" />
+                <path d="M 46 8 A 16 16 0 0 0 82 8" fill="none" stroke="#7db4ff" strokeWidth="8" strokeLinecap="round" />
+              </svg>
+            </div>
+            <div className="absolute inset-0 rounded-lg pointer-events-none opacity-30"
+                 style={{ background: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.5) 0px, rgba(0,0,0,0.5) 1px, transparent 1px, transparent 3px)' }} />
+          </div>
+        </div>
+      )}
+
+      {seq === 'shatter' && (
+        <div className="fixed inset-0 z-[95] select-none overflow-hidden pointer-events-none"
+             style={{ animation: 'screen-shake 0.5s linear' }}>
+          {/* 白光爆闪 */}
+          <div className="absolute inset-0 bg-white" style={{ animation: 'crack-flash 1.1s ease-out forwards' }} />
+          {/* 裂纹 */}
+          <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none"
+               style={{ animation: 'crack-flash 1.15s ease-out forwards' }}>
+            {[
+              'M50,50 L12,8', 'M50,50 L88,14', 'M50,50 L95,58', 'M50,50 L74,96',
+              'M50,50 L26,92', 'M50,50 L4,62', 'M50,50 L38,4', 'M50,50 L96,34',
+              'M50,50 L60,2', 'M50,50 L8,38',
+            ].map((d, i) => (
+              <path key={i} d={d} stroke="rgba(30,40,60,0.9)" strokeWidth="0.45" fill="none" />
+            ))}
+            {['M50,50 L30,26 L20,14', 'M50,50 L68,70 L82,84', 'M50,50 L66,32 L80,22'].map((d, i) => (
+              <path key={'b' + i} d={d} stroke="rgba(30,40,60,0.7)" strokeWidth="0.3" fill="none" />
+            ))}
+          </svg>
+          {/* 玻璃碎片飞散 */}
+          {Array.from({ length: 12 }).map((_, i) => {
+            const ang = (i / 12) * Math.PI * 2 + 0.3;
+            const dist = 55 + (i % 4) * 22;
+            return (
+              <div key={i}
+                className="absolute left-1/2 top-1/2 border border-white/50 bg-white/15"
+                style={{
+                  width: 26 + (i % 3) * 22, height: 30 + ((i + 1) % 3) * 20,
+                  clipPath: 'polygon(50% 0, 100% 68%, 12% 100%)',
+                  ['--tx' as string]: `${Math.cos(ang) * dist}vmin`,
+                  ['--ty' as string]: `${Math.sin(ang) * dist + 18}vmin`,
+                  ['--rot' as string]: `${(i % 2 === 0 ? 1 : -1) * (140 + i * 30)}deg`,
+                  animation: `shard-fly ${0.9 + (i % 3) * 0.15}s cubic-bezier(0.2, 0.6, 0.6, 1) forwards`,
+                }} />
+            );
+          })}
         </div>
       )}
 
