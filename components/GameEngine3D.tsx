@@ -161,6 +161,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
   const recognitionRef = useRef<any>(null);
   const voiceMatchRef = useRef(0);
   const toggleYuaRef = useRef<() => void>(() => {});
+  const refreshYuaVisualsRef = useRef<() => void>(() => {});
   const [lastHeard, setLastHeard] = useState('');
   const heardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -324,6 +325,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
     setCheckpointHit(false);
     setCurrentLayer(Layer.REAL);
     applyLayerRef.current(Layer.REAL);
+    refreshYuaVisualsRef.current();
   }, [levelConfig]);
 
   const handleLayerSwitch = useCallback(() => {
@@ -661,6 +663,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
 
     // ---- 玩家 ----
     const yuaRigVisRef = { current: null as ((v: boolean) => void) | null };
+    const clearYuaVisualsRef = { current: () => { /* 于悠亚系统就绪后接线 */ } };
     const rig = buildCharacter(skin);
     scene.add(rig.group);
     // 魔法熊猫（彩蛋变身体）
@@ -672,9 +675,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
         s.yua = false;
         setYuaMode(false);
         yuaRigVisRef.current?.(false);
-        applyLayer(layerRef.current);
-        canvas.style.animation = '';
-        canvas.style.filter = '';
+        clearYuaVisualsRef.current();
       }
       s.panda = on;
       if (!s.isDead) {
@@ -692,9 +693,42 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
     const yuaRig = buildYua();
     yuaRig.group.visible = false;
     scene.add(yuaRig.group);
-    const forceAllLayersVisible = () => {
-      for (const r of ents) r.applyLayer(layerRef.current, true);
+    // 黑白染色：把"本属于另一个次元"的实体渲染成灰阶（保留明度关系）
+    const tintBW = (rt: RtEnt) => {
+      rt.group.traverse(obj => {
+        const m = (obj as any).material;
+        if (!m) return;
+        const mats: any[] = Array.isArray(m) ? m : [m];
+        for (const mm of mats) {
+          if (!mm.color) continue;
+          if (!mm.__origColor) mm.__origColor = mm.color.clone();
+          const c = mm.__origColor;
+          const luma = 0.3 * c.r + 0.59 * c.g + 0.11 * c.b;
+          mm.color.setRGB(luma, luma, luma);
+        }
+      });
     };
+    const untintBW = (rt: RtEnt) => {
+      rt.group.traverse(obj => {
+        const m = (obj as any).material;
+        if (!m) return;
+        const mats: any[] = Array.isArray(m) ? m : [m];
+        for (const mm of mats) {
+          if (mm.__origColor) mm.color.copy(mm.__origColor);
+        }
+      });
+    };
+    const applyYuaVisuals = () => {
+      for (const r of ents) {
+        r.applyLayer(layerRef.current, true); // 所有次元的平台同时实体化
+        if (!isActive(r.ent, layerRef.current)) tintBW(r); // 借来的那层：黑白色
+      }
+    };
+    const clearYuaVisuals = () => {
+      for (const r of ents) untintBW(r);
+      applyLayer(layerRef.current); // 恢复正常分层与幽灵轮廓
+    };
+    refreshYuaVisualsRef.current = () => { if (s.yua) applyYuaVisuals(); };
     const setYua = (on: boolean) => {
       if (on && s.panda) { // 与魔法熊猫互斥：静默解除熊猫
         s.panda = false;
@@ -708,12 +742,9 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
       }
       setYuaMode(on);
       if (on) {
-        forceAllLayersVisible();          // 所有次元的平台同时实体化
-        canvas.style.animation = 'yua-bw 3.6s ease-in-out infinite';
+        applyYuaVisuals();
       } else {
-        applyLayer(layerRef.current);     // 恢复正常分层
-        canvas.style.animation = '';
-        canvas.style.filter = '';
+        clearYuaVisuals();
       }
       setPandaToast(on ? '⟡ 悠亚降临！所有次元同时存在' : '悠亚回去了……次元恢复分层');
       setTimeout(() => setPandaToast(''), 2800);
@@ -721,6 +752,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
     };
     toggleYuaRef.current = () => setYua(!s.yua);
     yuaRigVisRef.current = (v: boolean) => { yuaRig.group.visible = v; };
+    clearYuaVisualsRef.current = clearYuaVisuals;
     showToastRef.current = (msg: string) => {
       setPandaToast(msg);
       setTimeout(() => setPandaToast(''), 3000);
@@ -1469,8 +1501,18 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
         {micOn ? `🎤 聆听中${voiceCount > 0 ? ` ${voiceCount}/3` : '…'}` : '🎤 语音'}
       </button>
       {micOn && lastHeard && (
-        <div className="absolute right-3 bottom-24 z-30 max-w-[280px] pointer-events-none font-pixel text-[11px] text-blue-600 bg-white/85 border-2 border-blue-200 px-2.5 py-1.5 retro-border">
+        <div className="absolute right-3 bottom-[8.5rem] z-30 max-w-[280px] pointer-events-none font-pixel text-[11px] text-blue-600 bg-white/85 border-2 border-blue-200 px-2.5 py-1.5 retro-border">
           听到：「{lastHeard}」
+        </div>
+      )}
+      {micOn && (
+        <div className="absolute right-3 bottom-[5.5rem] z-30 w-[240px] pointer-events-none font-pixel bg-white/90 border-4 border-blue-200 px-3 py-2 retro-border flex items-start gap-2">
+          <span className="text-2xl leading-none select-none">🐧</span>
+          <span className="text-[11px] leading-relaxed text-blue-700 font-bold">
+            大喊三声<br />
+            「我要和<span className="inline-block w-10 border-b-2 border-blue-400 mx-0.5"></span>结婚！」<br />
+            她就会穿越次元，降临这个世界！
+          </span>
         </div>
       )}
 
@@ -1502,12 +1544,6 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
          [WASD] 移动 | [空格] 跳跃 | [Q] 切换线框层 | [鼠标拖动] 转视角 | [滚轮] 缩放
       </div>
 
-      <style>{`
-        @keyframes yua-bw {
-          0%, 100% { filter: grayscale(0.78) contrast(1.08); }
-          50% { filter: grayscale(0.2) contrast(1.0); }
-        }
-      `}</style>
       <div className="relative" style={{ width: 'min(96vw, 138vh, 1000px)' }}>
         <canvas
           ref={canvasRef}
