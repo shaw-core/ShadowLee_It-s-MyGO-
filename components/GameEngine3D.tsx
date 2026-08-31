@@ -161,6 +161,8 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
   const recognitionRef = useRef<any>(null);
   const voiceMatchRef = useRef(0);
   const toggleYuaRef = useRef<() => void>(() => {});
+  const [lastHeard, setLastHeard] = useState('');
+  const heardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { micOnRef.current = micOn; }, [micOn]);
   // 组件卸载时关闭麦克风
@@ -194,10 +196,21 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
         for (let i = ev.resultIndex; i < ev.results.length; i++) {
           const r = ev.results[i];
           if (!r.isFinal) continue;
-          const txt = String(r[0]?.transcript ?? '').replace(/[\s，,。.！!？?]/g, '');
-          // 完整咏唱直接计数；识别不完整时"悠亚"+"结婚"同句也算一次
-          let hits = (txt.match(/我要和悠亚悠亚结婚/g) ?? []).length;
-          if (hits === 0 && txt.includes('悠亚') && txt.includes('结婚')) hits = 1;
+          const txt = String(r[0]?.transcript ?? '').replace(/[\s，,。.！!？?、~～]/g, '');
+          if (txt) {
+            setLastHeard(txt.slice(-24));
+            if (heardTimerRef.current) clearTimeout(heardTimerRef.current);
+            heardTimerRef.current = setTimeout(() => setLastHeard(''), 3000);
+          }
+          // "悠亚"是名字，识别引擎会转写成各种同音词（优雅/幽雅/有啊/呦亚…）
+          // 因此用同音字类模糊匹配：出现 you+ya 音节组合 且 同句含"结婚"即算一次咏唱
+          const YOUYA = /[悠优幽呦游由油有右又哟幼柚佑youYU][亚雅呀压鸭丫哑娅芽阿啊吖噢哦aA]/g;
+          const pairs = (txt.match(YOUYA) ?? []).length;
+          let hits = 0;
+          if (/结婚|皆婚|结昏/.test(txt) && pairs >= 1) {
+            // 一口气喊了多遍完整咒语时也逐次计数（每遍含两个you-ya对）
+            hits = Math.max(1, Math.min(3, Math.floor(pairs / 2)));
+          }
           if (hits > 0) {
             voiceMatchRef.current += hits;
             setVoiceCount(Math.min(3, voiceMatchRef.current));
@@ -1455,6 +1468,11 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
       >
         {micOn ? `🎤 聆听中${voiceCount > 0 ? ` ${voiceCount}/3` : '…'}` : '🎤 语音'}
       </button>
+      {micOn && lastHeard && (
+        <div className="absolute right-3 bottom-24 z-30 max-w-[280px] pointer-events-none font-pixel text-[11px] text-blue-600 bg-white/85 border-2 border-blue-200 px-2.5 py-1.5 retro-border">
+          听到：「{lastHeard}」
+        </div>
+      )}
 
       {pandaToast && (
         <div className="absolute top-32 left-1/2 -translate-x-1/2 z-20 text-indigo-600 font-bold bg-white/90 border-4 border-indigo-300 px-5 py-2 retro-border shadow-lg pointer-events-none whitespace-nowrap text-sm md:text-base">
