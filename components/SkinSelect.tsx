@@ -48,8 +48,10 @@ const SkinSelect: React.FC<SkinSelectProps> = ({ currentSkin, novusUnlocked, rec
   const isPanda = skin.id === 'panda';
   const isYua = skin.id === 'yua';
   const [micOn, setMicOn] = useState(false);
+  const [chantCount, setChantCount] = useState(0);
   const micOnRef = useRef(false);
   const recognitionRef = useRef<any>(null);
+  const chantRef = useRef(0);
 
   // 语音彩蛋：对着麦克风喊出那句咒语，显现悠亚的档案
   const toggleMic = () => {
@@ -75,13 +77,20 @@ const SkinSelect: React.FC<SkinSelectProps> = ({ currentSkin, novusUnlocked, rec
           const YOUYA = /[悠优幽呦游由油有右又哟幼柚佑youYU][亚雅呀压鸭丫哑娅芽阿啊吖噢哦aA]/g;
           const pairs = (txt.match(YOUYA) ?? []).length;
           if (/结婚|皆婚|结昏/.test(txt) && pairs >= 1) {
-            // 档案界面：喊一声即可显现
-            micOnRef.current = false;
-            setMicOn(false);
-            try { rec.stop(); } catch { /* ignore */ }
-            recognitionRef.current = null;
-            setYuaRevealed(true);
-            setIndex(SKINS.length + (pandaRevealed ? 1 : 0)); // 翻到悠亚页
+            // 和游戏内一样：要喊满三声
+            const hits = Math.max(1, Math.min(3, Math.floor(pairs / 2)));
+            chantRef.current += hits;
+            setChantCount(Math.min(3, chantRef.current));
+            if (chantRef.current >= 3) {
+              chantRef.current = 0;
+              setChantCount(0);
+              micOnRef.current = false;
+              setMicOn(false);
+              try { rec.stop(); } catch { /* ignore */ }
+              recognitionRef.current = null;
+              setYuaRevealed(true);
+              setIndex(SKINS.length + (pandaRevealed ? 1 : 0)); // 翻到悠亚页
+            }
           }
         }
       };
@@ -256,7 +265,7 @@ const SkinSelect: React.FC<SkinSelectProps> = ({ currentSkin, novusUnlocked, rec
         }`}
         title={micOn ? '正在聆听……对这里说出那句话' : '这里好像也能听到声音……'}
       >
-        <Mic size={13} className="mr-1.5" /> {micOn ? '聆听中……' : '语音'}
+        <Mic size={13} className="mr-1.5" /> {micOn ? `聆听中…${chantCount > 0 ? ` ${chantCount}/3` : ''}` : '语音'}
       </button>
 
       <button onClick={() => !isLocked && !isPanda && !isYua && onConfirm(skin.id as SkinId)} disabled={isLocked || isPanda || isYua}
