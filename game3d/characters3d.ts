@@ -771,7 +771,10 @@ export const buildYua = (): CharacterRig => {
   const sideL = box(0.1, 0.52, 0.3, 0xe0e0ec);
   sideL.position.set(-0.26, -0.08, 0.0);
   const sideR = sideL.clone(); sideR.position.x = 0.26;
-  head.add(hairTop, bangs, sideL, sideR);
+  // 后脑发片：上接顶发、下压进长发，盖住整个后脑勺
+  const backHair = box(0.48, 0.5, 0.12, 0xe8e8f0);
+  backHair.position.set(0, -0.04, -0.2);
+  head.add(hairTop, bangs, sideL, sideR, backHair);
   const longHair = box(0.42, 0.72, 0.12, 0xe8e8f0);
   longHair.position.set(0, 0.6, -0.22);
   const hairTip = box(0.34, 0.16, 0.1, 0xd8d8e8);
