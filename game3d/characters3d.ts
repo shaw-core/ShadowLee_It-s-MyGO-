@@ -796,3 +796,84 @@ export const buildYua = (): CharacterRig => {
 
   return { group, body, head, legL, legR, armL, armR };
 };
+
+// ============ 存档点小企鹅（悠亚降临时的锚点形态；右脸蓝星与熊猫同源） ============
+export const buildCheckpointPenguin = (): { group: THREE.Group; setActivated: () => void; reset: () => void } => {
+  const group = new THREE.Group();
+  const s = 0.62;
+  const inner = new THREE.Group();
+  inner.scale.set(s, s, s);
+  group.add(inner);
+
+  // 圆润身体：黑背白肚
+  const torso = box(0.48, 0.56, 0.42, 0x1a1f2e);
+  torso.position.y = 0.42;
+  const belly = box(0.34, 0.4, 0.06, 0xffffff);
+  belly.position.set(0, 0.38, 0.2);
+  inner.add(torso, belly);
+  // 小翅膀
+  const mkWing = (x: number, rot: number) => {
+    const w = box(0.09, 0.3, 0.16, 0x1a1f2e);
+    w.position.set(x, 0.42, 0.02);
+    w.rotation.z = rot;
+    inner.add(w);
+  };
+  mkWing(-0.29, 0.25); mkWing(0.29, -0.25);
+  // 橙色小脚
+  const mkFoot = (x: number) => {
+    const f = box(0.14, 0.06, 0.22, 0xf97316);
+    f.position.set(x, 0.03, 0.08);
+    inner.add(f);
+  };
+  mkFoot(-0.13); mkFoot(0.13);
+
+  // 头（与身体连成团）
+  const head = new THREE.Group();
+  head.position.y = 0.82;
+  inner.add(head);
+  const skull = box(0.44, 0.34, 0.4, 0x1a1f2e);
+  head.add(skull);
+  const faceWhite = box(0.3, 0.2, 0.03, 0xffffff);
+  faceWhite.position.set(0, -0.02, 0.2);
+  head.add(faceWhite);
+  // 眼睛
+  const mkEye = (x: number) => {
+    const e2 = box(0.05, 0.07, 0.02, COL.black);
+    e2.position.set(x, 0.02, 0.215);
+    const hl = box(0.018, 0.02, 0.022, COL.white);
+    hl.position.set(x + 0.012, 0.04, 0.216);
+    head.add(e2, hl);
+  };
+  mkEye(-0.09); mkEye(0.09);
+  // 橙色小嘴
+  const beak = box(0.08, 0.05, 0.08, 0xf97316);
+  beak.position.set(0, -0.05, 0.23);
+  head.add(beak);
+  // 右脸蓝星（锚点同源标记）
+  const star = new THREE.Mesh(new THREE.CircleGeometry(0.06, 5), new THREE.MeshBasicMaterial({ color: 0x8db8f5, side: THREE.DoubleSide }));
+  star.position.set(0.17, -0.05, 0.216);
+  head.add(star);
+
+  // 围巾（未激活灰蓝 → 激活粉）
+  const scarfMat = mat(0x93a6c4);
+  const scarf = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.1, 0.38), scarfMat);
+  scarf.position.y = 0.64;
+  inner.add(scarf);
+  // 头顶星（激活后出现）
+  const topStar = new THREE.Mesh(new THREE.OctahedronGeometry(0.09), new THREE.MeshStandardMaterial({ color: 0xf9a8d4, emissive: 0xdb2777, emissiveIntensity: 0.7, flatShading: true }));
+  topStar.position.y = 1.2;
+  topStar.visible = false;
+  inner.add(topStar);
+
+  return {
+    group,
+    setActivated: () => {
+      scarfMat.color.setHex(0xf472b6);
+      topStar.visible = true;
+    },
+    reset: () => {
+      scarfMat.color.setHex(0x93a6c4);
+      topStar.visible = false;
+    },
+  };
+};

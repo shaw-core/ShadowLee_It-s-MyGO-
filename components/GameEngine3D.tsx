@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { Layer, LevelResult } from '../types';
 import { Level3D, Entity3D } from '../game3d/levels3d';
-import { SkinId, buildCharacter, buildPandaWitch, buildCheckpointPanda, buildYua } from '../game3d/characters3d';
+import { SkinId, buildCharacter, buildPandaWitch, buildCheckpointPanda, buildCheckpointPenguin, buildYua } from '../game3d/characters3d';
 import { BookOpen, Candy, RotateCcw, Home, FastForward, Flag } from 'lucide-react';
 
 interface GameEngineProps {
@@ -510,24 +510,34 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
           (_l, active) => { g.visible = active && !stateRef.current.collected.has(e.id); },
           (t) => { shard.rotation.y = t * 2; shard.position.y = Math.sin(t * 2.4 + e.x) * 0.12; });
       } else if (e.type === 'CHECKPOINT') {
+        // 双形态锚点：熊猫（默认）/ 企鹅（悠亚降临时）
+        const holder = new THREE.Group();
+        holder.position.y = -0.55; // 坐在平台面上（实体中心略高于地面）
         const panda = buildCheckpointPanda();
-        panda.group.position.y = -0.55; // 让小熊猫坐在平台面上（实体中心略高于地面）
-        g.add(panda.group);
+        const penguin = buildCheckpointPenguin();
+        penguin.group.visible = false;
+        holder.add(panda.group, penguin.group);
+        g.add(holder);
         const rt: RtEnt = {
           ent: e, group: g,
           x: e.x, y: e.y, z: e.z, hw: 0.8, hh: 1.0, hd: 0.8,
           base: new THREE.Vector3(e.x, e.y, e.z), prev: new THREE.Vector3(e.x, e.y, e.z),
           applyLayer: (_l, active) => { g.visible = active; },
           animate: (t) => {
-            panda.group.rotation.y = Math.sin(t * 0.8) * 0.3;
-            panda.group.position.y = -0.55 + Math.abs(Math.sin(t * 2.4)) * 0.03;
+            holder.rotation.y = Math.sin(t * 0.8) * 0.3;
+            holder.position.y = -0.55 + Math.abs(Math.sin(t * 2.4)) * 0.03;
           },
         };
         g.position.set(e.x, e.y, e.z);
         scene.add(g);
         ents.push(rt);
-        (rt as any).setActivated = () => { panda.setActivated(); };
-        (rt as any).resetVisual = () => { panda.reset(); };
+        // 激活/重置对两种形态同步，保证切换形态不丢状态
+        (rt as any).setActivated = () => { panda.setActivated(); penguin.setActivated(); };
+        (rt as any).resetVisual = () => { panda.reset(); penguin.reset(); };
+        (rt as any).setYuaForm = (on: boolean) => {
+          panda.group.visible = !on;
+          penguin.group.visible = on;
+        };
       } else if (e.type === 'GOAL' && levelConfig.id === 5) {
         // 终章：世界的裂缝（没对齐的接缝，发着呼吸般的光）
         const crackMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
@@ -718,15 +728,20 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
         }
       });
     };
+    const setAnchorForms = (on: boolean) => {
+      for (const r of ents) (r as any).setYuaForm?.(on);
+    };
     const applyYuaVisuals = () => {
       for (const r of ents) {
         r.applyLayer(layerRef.current, true); // 所有次元的平台同时实体化
         if (!isActive(r.ent, layerRef.current)) tintBW(r); // 借来的那层：黑白色
       }
+      setAnchorForms(true); // 熊猫锚点 → 企鹅锚点
     };
     const clearYuaVisuals = () => {
       for (const r of ents) untintBW(r);
       applyLayer(layerRef.current); // 恢复正常分层与幽灵轮廓
+      setAnchorForms(false); // 企鹅锚点 → 熊猫锚点
     };
     refreshYuaVisualsRef.current = () => { if (s.yua) applyYuaVisuals(); };
     const setYua = (on: boolean) => {
