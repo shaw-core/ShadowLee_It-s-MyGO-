@@ -11,7 +11,7 @@ https://shaw-core.github.io/ShadowLee_It-s-MyGO-/
 
 建议使用桌面端 Chrome、Edge 或其他现代浏览器，并开启声音以获得完整体验。
 
-当前版本：**v0.13.4**
+当前版本：**v0.13.7**
 
 ---
 
