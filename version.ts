@@ -1,5 +1,5 @@
 // 版本号与构建历史（每次迭代交付时更新）
-export const GAME_VERSION = 'v0.13.0';
+export const GAME_VERSION = 'v0.13.1';
 
 export const CHANGELOG = `PROJECT SHADOWLEE —— build history
 ──────────────────────────────────────
