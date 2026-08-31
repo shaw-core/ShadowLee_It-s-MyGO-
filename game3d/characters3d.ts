@@ -640,3 +640,159 @@ export const buildCheckpointPanda = (): { group: THREE.Group; setActivated: () =
     },
   };
 };
+
+
+// ============ 悠亚 Yua（银白长发·圆框眼镜·水手服·企鹅胸针·星星发卡） ============
+export const buildYua = (): CharacterRig => {
+  const group = new THREE.Group();
+  const body = new THREE.Group();
+  group.add(body);
+
+  const makeLeg = (x: number) => {
+    const leg = new THREE.Group();
+    leg.position.set(x, 0.48, 0);
+    const thigh = box(0.12, 0.32, 0.14, COL.skin);
+    thigh.position.y = -0.16;
+    const sock = box(0.14, 0.22, 0.16, COL.white);
+    sock.position.y = -0.48;
+    const shoe = box(0.14, 0.1, 0.19, 0x2a3245);
+    shoe.position.set(0, -0.64, 0.02);
+    leg.add(thigh, sock, shoe);
+    return leg;
+  };
+  const legL = makeLeg(-0.11);
+  const legR = makeLeg(0.11);
+  body.add(legL, legR);
+
+  // 水手裙
+  const skirtInner = box(0.38, 0.12, 0.28, COL.white);
+  skirtInner.position.y = 0.48;
+  const skirtOuter = box(0.44, 0.1, 0.34, 0x7dacd4);
+  skirtOuter.position.y = 0.4;
+  body.add(skirtInner, skirtOuter);
+
+  // 蓝色水手上衣 + 白领 + 领结
+  const shirt = box(0.48, 0.4, 0.32, 0x8ec0d8);
+  shirt.position.y = 0.72;
+  const collar = box(0.34, 0.28, 0.02, COL.white);
+  collar.position.set(0, 0.78, 0.17);
+  collar.rotation.x = 0.15;
+  const ribbon = box(0.14, 0.1, 0.04, 0x4a7fa5);
+  ribbon.position.set(0, 0.66, 0.18);
+  body.add(shirt, collar, ribbon);
+
+  // 黑色颈圈 + 小圆挂件
+  const choker = box(0.36, 0.055, 0.28, COL.black);
+  choker.position.y = 0.96;
+  const pend = ball(0.038, COL.white);
+  pend.position.set(0, 0.93, 0.15);
+  body.add(choker, pend);
+
+  // 企鹅胸针（左胸）：黑色圆身 + 白肚 + 橙嘴 + 小翅膀 + 白点眼
+  const penBody = box(0.075, 0.095, 0.04, 0x1a1f2e);
+  penBody.position.set(-0.14, 0.76, 0.175);
+  const penBelly = box(0.042, 0.055, 0.025, COL.white);
+  penBelly.position.set(-0.14, 0.755, 0.195);
+  const penBeak = box(0.018, 0.014, 0.02, 0xf97316);
+  penBeak.position.set(-0.14, 0.785, 0.2);
+  const penWingL = box(0.018, 0.05, 0.02, 0x1a1f2e);
+  penWingL.position.set(-0.166, 0.758, 0.18);
+  penWingL.rotation.z = 0.3;
+  const penWingR = box(0.018, 0.05, 0.02, 0x1a1f2e);
+  penWingR.position.set(-0.114, 0.758, 0.18);
+  penWingR.rotation.z = -0.3;
+  const mkPenEye = (dx: number) => {
+    const e2 = ball(0.008, COL.white);
+    e2.position.set(-0.14 + dx, 0.782, 0.198);
+    body.add(e2);
+  };
+  mkPenEye(-0.013); mkPenEye(0.013);
+  body.add(penBody, penBelly, penBeak, penWingL, penWingR);
+
+  const makeArm = (x: number) => {
+    const arm = new THREE.Group();
+    arm.position.set(x, 0.9, 0);
+    const sleeve = box(0.13, 0.3, 0.15, 0x8ec0d8);
+    sleeve.position.y = -0.14;
+    const cuff = box(0.14, 0.06, 0.16, COL.white);
+    cuff.position.y = -0.32;
+    const hand = box(0.1, 0.09, 0.1, COL.skin);
+    hand.position.y = -0.42;
+    arm.add(sleeve, cuff, hand);
+    return arm;
+  };
+  const armL = makeArm(-0.3);
+  const armR = makeArm(0.3);
+  body.add(armL, armR);
+
+  // 头
+  const head = new THREE.Group();
+  head.position.y = 1.12;
+  body.add(head);
+  const face = box(0.44, 0.4, 0.38, COL.skin);
+  head.add(face);
+
+  // 圆框眼镜
+  const glassMat = new THREE.MeshStandardMaterial({ color: 0x3a4152, flatShading: true, roughness: 0.6, metalness: 0.3 });
+  const mkLens = (x: number) => {
+    const frame = new THREE.Mesh(new THREE.TorusGeometry(0.072, 0.012, 6, 14), glassMat);
+    frame.position.set(x, 0.04, 0.2);
+    frame.castShadow = true;
+    const lens = new THREE.Mesh(new THREE.CircleGeometry(0.062, 14),
+      new THREE.MeshStandardMaterial({ color: 0x9dc8e8, transparent: true, opacity: 0.22, side: THREE.DoubleSide }));
+    lens.position.set(x, 0.04, 0.201);
+    head.add(frame, lens);
+  };
+  mkLens(-0.11); mkLens(0.11);
+  const bridge = box(0.06, 0.012, 0.02, 0x3a4152);
+  bridge.position.set(0, 0.04, 0.2);
+  head.add(bridge);
+
+  // 眼睛（蓝灰）+ 腮红 + 微张的嘴
+  const mkEye = (x: number) => {
+    const w = box(0.09, 0.095, 0.02, COL.white);
+    w.position.set(x, 0.04, 0.195);
+    const iris = box(0.05, 0.095, 0.022, 0x6a9bc4);
+    iris.position.set(x + 0.015, 0.04, 0.196);
+    head.add(w, iris);
+  };
+  mkEye(-0.11); mkEye(0.11);
+  const mkB = (x: number) => { const b = box(0.07, 0.03, 0.02, COL.blush); b.position.set(x, -0.05, 0.2); head.add(b); };
+  mkB(-0.17); mkB(0.17);
+  const mouth = box(0.05, 0.04, 0.02, 0xe36b7a);
+  mouth.position.set(0, -0.1, 0.2);
+  head.add(mouth);
+
+  // 银白长发 + 蓝色内层发
+  const hairTop = box(0.5, 0.18, 0.46, 0xe8e8f0);
+  hairTop.position.y = 0.24;
+  const bangs = box(0.48, 0.15, 0.1, 0xe8e8f0);
+  bangs.position.set(0, 0.18, 0.16);
+  const sideL = box(0.1, 0.52, 0.3, 0xe0e0ec);
+  sideL.position.set(-0.26, -0.08, 0.0);
+  const sideR = sideL.clone(); sideR.position.x = 0.26;
+  head.add(hairTop, bangs, sideL, sideR);
+  const longHair = box(0.42, 0.72, 0.12, 0xe8e8f0);
+  longHair.position.set(0, 0.6, -0.22);
+  const hairTip = box(0.34, 0.16, 0.1, 0xd8d8e8);
+  hairTip.position.set(0, 0.22, -0.22);
+  const blueStrand = box(0.08, 0.6, 0.06, 0x93c5fd);
+  blueStrand.position.set(-0.18, 0.62, -0.2);
+  body.add(longHair, hairTip, blueStrand);
+
+  // 白色发箍 + 星星发卡（右侧）
+  const hairband = new THREE.Mesh(
+    new THREE.TorusGeometry(0.24, 0.028, 6, 20, Math.PI),
+    new THREE.MeshStandardMaterial({ color: COL.white, flatShading: true, roughness: 0.9 }));
+  hairband.rotation.x = -Math.PI / 2;
+  hairband.rotation.z = Math.PI;
+  hairband.position.set(0, 0.28, 0.02);
+  head.add(hairband);
+  const starPin = new THREE.Mesh(new THREE.CircleGeometry(0.06, 5),
+    new THREE.MeshBasicMaterial({ color: 0xfde68a, side: THREE.DoubleSide }));
+  starPin.position.set(0.23, 0.32, 0.06);
+  starPin.rotation.y = -0.3;
+  head.add(starPin);
+
+  return { group, body, head, legL, legR, armL, armR };
+};

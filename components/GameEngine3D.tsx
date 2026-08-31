@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { Layer, LevelResult } from '../types';
 import { Level3D, Entity3D } from '../game3d/levels3d';
-import { SkinId, buildCharacter, buildPandaWitch, buildCheckpointPanda } from '../game3d/characters3d';
+import { SkinId, buildCharacter, buildPandaWitch, buildCheckpointPanda, buildYua } from '../game3d/characters3d';
 import { BookOpen, Candy, RotateCcw, Home, FastForward, Flag } from 'lucide-react';
 
 interface GameEngineProps {
@@ -153,6 +153,84 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
   const [pandaMode, setPandaMode] = useState(false);
   const [pandaToast, setPandaToast] = useState('');
   const togglePandaRef = useRef<() => void>(() => {});
+  // （麦克风逻辑在下方 toggleMic）
+  const [yuaMode, setYuaMode] = useState(false);
+  const [micOn, setMicOn] = useState(false);
+  const [voiceCount, setVoiceCount] = useState(0);
+  const micOnRef = useRef(false);
+  const recognitionRef = useRef<any>(null);
+  const voiceMatchRef = useRef(0);
+  const toggleYuaRef = useRef<() => void>(() => {});
+
+  useEffect(() => { micOnRef.current = micOn; }, [micOn]);
+  // 组件卸载时关闭麦克风
+  useEffect(() => () => {
+    micOnRef.current = false;
+    try { recognitionRef.current?.stop(); } catch { /* ignore */ }
+  }, []);
+
+  const showToastRef = useRef<(msg: string) => void>(() => {});
+
+  const toggleMic = () => {
+    if (micOn) {
+      setMicOn(false);
+      micOnRef.current = false;
+      try { recognitionRef.current?.stop(); } catch { /* ignore */ }
+      recognitionRef.current = null;
+      return;
+    }
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) {
+      showToastRef.current('当前浏览器不支持语音识别（推荐 Chrome / Edge）');
+      return;
+    }
+    try {
+      const rec = new SR();
+      rec.lang = 'zh-CN';
+      rec.continuous = true;
+      rec.interimResults = false;
+      rec.maxAlternatives = 1;
+      rec.onresult = (ev: any) => {
+        for (let i = ev.resultIndex; i < ev.results.length; i++) {
+          const r = ev.results[i];
+          if (!r.isFinal) continue;
+          const txt = String(r[0]?.transcript ?? '').replace(/[\s，,。.！!？?]/g, '');
+          // 完整咏唱直接计数；识别不完整时"悠亚"+"结婚"同句也算一次
+          let hits = (txt.match(/我要和悠亚悠亚结婚/g) ?? []).length;
+          if (hits === 0 && txt.includes('悠亚') && txt.includes('结婚')) hits = 1;
+          if (hits > 0) {
+            voiceMatchRef.current += hits;
+            setVoiceCount(Math.min(3, voiceMatchRef.current));
+            if (voiceMatchRef.current >= 3) {
+              voiceMatchRef.current = 0;
+              setVoiceCount(0);
+              toggleYuaRef.current();
+            }
+          }
+        }
+      };
+      rec.onend = () => {
+        // 连续识别常被浏览器自动停止：仍处于开启状态则重启
+        if (micOnRef.current) {
+          try { rec.start(); } catch { /* ignore */ }
+        }
+      };
+      rec.onerror = (ev: any) => {
+        if (ev?.error === 'not-allowed' || ev?.error === 'service-not-allowed') {
+          setMicOn(false);
+          micOnRef.current = false;
+          showToastRef.current('麦克风权限被拒绝，无法进行咏唱');
+        }
+      };
+      rec.start();
+      recognitionRef.current = rec;
+      setMicOn(true);
+      micOnRef.current = true;
+      showToastRef.current('🎤 麦克风已开启……大声说出那句咒语，三次！');
+    } catch {
+      showToastRef.current('麦克风启动失败');
+    }
+  };
   const cacheAnchorRef = useRef<() => void>(() => {});
   const resetWorldRef = useRef<() => void>(() => {});
   const [cacheUsed, setCacheUsed] = useState(false);
@@ -182,6 +260,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
     shieldOk: false,
     invulnT: 0,
     panda: false,
+    yua: false,
     typed: '',
     shakeT: 0,
     cacheUsed: false,
@@ -269,7 +348,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
         case 'Space': e.preventDefault(); s.jumpBufferT = JUMP_BUFFER; s.keys.up = true; break;
         case 'ShiftLeft': case 'ShiftRight': s.keys.down = true; break;
         case 'KeyE': cacheAnchorRef.current(); break;
-        case 'KeyQ': if (!s.isDead) handleLayerSwitch(); break;
+        case 'KeyQ': if (!s.isDead && !s.yua) handleLayerSwitch(); break;
         case 'Escape': onExitRef.current(); break;
       }
     };
@@ -568,6 +647,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
     applyLayerRef.current = applyLayer;
 
     // ---- 玩家 ----
+    const yuaRigVisRef = { current: null as ((v: boolean) => void) | null };
     const rig = buildCharacter(skin);
     scene.add(rig.group);
     // 魔法熊猫（彩蛋变身体）
@@ -575,6 +655,14 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
     pandaRig.group.visible = false;
     scene.add(pandaRig.group);
     const setPanda = (on: boolean) => {
+      if (on && s.yua) { // 与悠亚互斥：静默解除悠亚
+        s.yua = false;
+        setYuaMode(false);
+        yuaRigVisRef.current?.(false);
+        applyLayer(layerRef.current);
+        canvas.style.animation = '';
+        canvas.style.filter = '';
+      }
       s.panda = on;
       if (!s.isDead) {
         rig.group.visible = !on;
@@ -586,6 +674,44 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
       particles.burst(new THREE.Vector3(s.p.x, s.p.y + 0.5, s.p.z), on ? 0x8db8f5 : 0xf6d76b, 34, 3, 3.5);
     };
     togglePandaRef.current = () => setPanda(!s.panda);
+
+    // 悠亚（麦克风咏唱变身体）：同时存在于所有次元
+    const yuaRig = buildYua();
+    yuaRig.group.visible = false;
+    scene.add(yuaRig.group);
+    const forceAllLayersVisible = () => {
+      for (const r of ents) r.applyLayer(layerRef.current, true);
+    };
+    const setYua = (on: boolean) => {
+      if (on && s.panda) { // 与魔法熊猫互斥：静默解除熊猫
+        s.panda = false;
+        setPandaMode(false);
+        pandaRig.group.visible = false;
+      }
+      s.yua = on;
+      if (!s.isDead) {
+        rig.group.visible = !on;
+        yuaRig.group.visible = on;
+      }
+      setYuaMode(on);
+      if (on) {
+        forceAllLayersVisible();          // 所有次元的平台同时实体化
+        canvas.style.animation = 'yua-bw 3.6s ease-in-out infinite';
+      } else {
+        applyLayer(layerRef.current);     // 恢复正常分层
+        canvas.style.animation = '';
+        canvas.style.filter = '';
+      }
+      setPandaToast(on ? '⟡ 悠亚降临！所有次元同时存在' : '悠亚回去了……次元恢复分层');
+      setTimeout(() => setPandaToast(''), 2800);
+      particles.burst(new THREE.Vector3(s.p.x, s.p.y + 0.5, s.p.z), on ? 0xe8e8f0 : 0x93c5fd, 40, 3.2, 3.5);
+    };
+    toggleYuaRef.current = () => setYua(!s.yua);
+    yuaRigVisRef.current = (v: boolean) => { yuaRig.group.visible = v; };
+    showToastRef.current = (msg: string) => {
+      setPandaToast(msg);
+      setTimeout(() => setPandaToast(''), 3000);
+    };
 
     // 电视头小豆：缓存锚点（蓝色全息标记）
     const cacheMarker = new THREE.Group();
@@ -677,6 +803,14 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
       };
     };
     const physics = { [Layer.REAL]: listsFor(Layer.REAL), [Layer.MANGA]: listsFor(Layer.MANGA) };
+    const unionEnts = (a: RtEnt[], b: RtEnt[]) => Array.from(new Set([...a, ...b]));
+    const physicsAll = {
+      solids: unionEnts(physics[Layer.REAL].solids, physics[Layer.MANGA].solids),
+      hazards: unionEnts(physics[Layer.REAL].hazards, physics[Layer.MANGA].hazards),
+      pickups: unionEnts(physics[Layer.REAL].pickups, physics[Layer.MANGA].pickups),
+      goals: unionEnts(physics[Layer.REAL].goals, physics[Layer.MANGA].goals),
+      checkpoints: unionEnts(physics[Layer.REAL].checkpoints, physics[Layer.MANGA].checkpoints),
+    };
     const movers = ents.filter(r => r.ent.type === 'MOVER');
     const triggers = ents.filter(r => r.ent.type === 'TRIGGER');
     const shifters = ents.filter(r => r.ent.shiftTo !== undefined);
@@ -726,6 +860,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
       particles.burst(new THREE.Vector3(s.p.x, s.p.y, s.p.z), 0xf87171, 30, 3.5, 3);
       rig.group.visible = false;
       pandaRig.group.visible = false;
+      yuaRig.group.visible = false;
       respawnTimer = setTimeout(() => {
         s.p.x = s.spawn.x; s.p.y = s.spawn.y; s.p.z = s.spawn.z;
         s.pp.x = s.p.x; s.pp.y = s.p.y; s.pp.z = s.p.z;
@@ -737,8 +872,9 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
         s.shieldOk = true;
         setShieldUsed(false);
         setStunned(false);
-        rig.group.visible = !s.panda;
+        rig.group.visible = !s.panda && !s.yua;
         pandaRig.group.visible = s.panda;
+        yuaRig.group.visible = s.yua;
         particles.burst(new THREE.Vector3(s.p.x, s.p.y, s.p.z), 0x93c5fd, 20, 2, 2.5);
       }, 350);
     };
@@ -946,7 +1082,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
       if (p.vy < -20) p.vy = -20;
       }
 
-      const lists = physics[layerRef.current];
+      const lists = s.yua ? physicsAll : physics[layerRef.current];
 
       // 逐轴移动 + 解析（记录本轴移动前的位置用于方向判定）
       const px0 = p.x;
@@ -1068,6 +1204,35 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
         pandaRig.group.rotation.x = THREE.MathUtils.clamp(-p.vy * 0.045, -0.35, 0.3);
         pandaRig.body.position.y = Math.sin(s.t * 3.2) * 0.06;
         pandaRig.head.rotation.z = Math.sin(s.t * 2.1) * 0.05;
+      } else if (s.yua) {
+        yuaRig.group.position.set(px, py - PLAYER.hh, pz);
+        if (!s.isDead) {
+          yuaRig.group.visible = s.invulnT > 0 ? Math.sin(s.t * 30) > -0.3 : true;
+          rig.group.visible = false;
+        }
+        const movingY = Math.hypot(p.vx, p.vz) > 0.4;
+        if (movingY) facing = Math.atan2(p.vx, p.vz);
+        let day = facing - yuaRig.group.rotation.y;
+        while (day > Math.PI) day -= Math.PI * 2;
+        while (day < -Math.PI) day += Math.PI * 2;
+        yuaRig.group.rotation.y += day * 0.18;
+        const spdY = Math.hypot(p.vx, p.vz) / 6;
+        if (!p.grounded) {
+          yuaRig.legL.rotation.x = 0.4; yuaRig.legR.rotation.x = -0.3;
+          yuaRig.armL.rotation.x = -0.5; yuaRig.armR.rotation.x = -0.5;
+        } else if (movingY) {
+          const w = Math.sin(s.t * 10);
+          yuaRig.legL.rotation.x = w * 0.7 * spdY;
+          yuaRig.legR.rotation.x = -w * 0.7 * spdY;
+          yuaRig.armL.rotation.x = -w * 0.5 * spdY;
+          yuaRig.armR.rotation.x = w * 0.5 * spdY;
+          yuaRig.body.position.y = Math.abs(Math.sin(s.t * 10)) * 0.05;
+        } else {
+          yuaRig.legL.rotation.x = 0; yuaRig.legR.rotation.x = 0;
+          yuaRig.armL.rotation.x = 0; yuaRig.armR.rotation.x = 0;
+          yuaRig.body.position.y = Math.sin(s.t * 2.2) * 0.03;
+        }
+        yuaRig.head.rotation.z = Math.sin(s.t * 1.6) * 0.04;
       } else if (s.invulnT > 0) rig.group.visible = Math.sin(s.t * 30) > -0.3;
       else if (!s.isDead) rig.group.visible = true;
       const moving = Math.hypot(p.vx, p.vz) > 0.4;
@@ -1225,7 +1390,7 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
             ? 'bg-white border-blue-500 text-blue-900'
             : 'bg-black border-white text-white'
         }`}>
-            {currentLayer === Layer.REAL ? '现实' : '线框'}
+            {yuaMode ? '重叠' : currentLayer === Layer.REAL ? '现实' : '线框'}
         </div>
         {/* 晕3D 值：豆沙的老毛病（室友姐不受影响） */}
         {dizzyEnabled && !pandaMode && (
@@ -1241,12 +1406,13 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
         )}
         {/* 外观能力徽章 */}
         <div className="px-3 py-2 bg-white/85 border-4 border-emerald-300 retro-border text-emerald-700 text-xs font-bold shadow-lg">
+          {yuaMode && !pandaMode && '⟡ 悠亚 · 次元穿梭'}
           {pandaMode && '✨ 魔法熊猫'}
-          {!pandaMode && skin === 'skin1' && '☁ 安心毛绒'}
-          {!pandaMode && skin === 'skin2' && (cacheUsed ? '⚡ 缓存锚点(已用)' : '⚡ 缓存锚点(按E)')}
-          {!pandaMode && skin === 'skin3' && '★ 二段跳'}
-          {!pandaMode && skin === 'skin4' && (shieldUsed ? '✕ 创可贴(已用)' : '✚ 创可贴')}
-          {!pandaMode && skin === 'skinNovus' && '∞ 次元之外'}
+          {!pandaMode && !yuaMode && skin === 'skin1' && '☁ 安心毛绒'}
+          {!pandaMode && !yuaMode && skin === 'skin2' && (cacheUsed ? '⚡ 缓存锚点(已用)' : '⚡ 缓存锚点(按E)')}
+          {!pandaMode && !yuaMode && skin === 'skin3' && '★ 二段跳'}
+          {!pandaMode && !yuaMode && skin === 'skin4' && (shieldUsed ? '✕ 创可贴(已用)' : '✚ 创可贴')}
+          {!pandaMode && !yuaMode && skin === 'skinNovus' && '∞ 次元之外'}
         </div>
       </div>
 
@@ -1278,6 +1444,18 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
          </button>
       </div>
 
+      <button
+        onClick={toggleMic}
+        className={`absolute right-3 bottom-12 z-30 pointer-events-auto font-pixel text-xs font-bold px-3 py-1.5 border-4 retro-border transition-colors ${
+          micOn
+            ? 'bg-pink-100 border-pink-400 text-pink-600 animate-pulse'
+            : 'bg-white/85 border-blue-300 text-blue-500 hover:border-pink-400 hover:text-pink-500'
+        }`}
+        title={micOn ? '正在聆听咏唱…（点击关闭）' : '开启麦克风咏唱'}
+      >
+        {micOn ? `🎤 聆听中${voiceCount > 0 ? ` ${voiceCount}/3` : '…'}` : '🎤 语音'}
+      </button>
+
       {pandaToast && (
         <div className="absolute top-32 left-1/2 -translate-x-1/2 z-20 text-indigo-600 font-bold bg-white/90 border-4 border-indigo-300 px-5 py-2 retro-border shadow-lg pointer-events-none whitespace-nowrap text-sm md:text-base">
           {pandaToast}
@@ -1306,6 +1484,12 @@ const GameEngine3D: React.FC<GameEngineProps> = ({ levelConfig, skin, onFinishLe
          [WASD] 移动 | [空格] 跳跃 | [Q] 切换线框层 | [鼠标拖动] 转视角 | [滚轮] 缩放
       </div>
 
+      <style>{`
+        @keyframes yua-bw {
+          0%, 100% { filter: grayscale(0.78) contrast(1.08); }
+          50% { filter: grayscale(0.2) contrast(1.0); }
+        }
+      `}</style>
       <div className="relative" style={{ width: 'min(96vw, 138vh, 1000px)' }}>
         <canvas
           ref={canvasRef}

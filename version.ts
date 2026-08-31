@@ -1,5 +1,5 @@
 // 版本号与构建历史（每次迭代交付时更新）
-export const GAME_VERSION = 'v0.12.2';
+export const GAME_VERSION = 'v0.13.0';
 
 export const CHANGELOG = `PROJECT SHADOWLEE —— build history
 ──────────────────────────────────────
@@ -20,4 +20,6 @@ v0.11.x  稳定性维护 × 9
 v0.12.0  音频库扩充（+6）／
          检测到界面层未授权演出 [已归档]
 v0.12.1  界面层演出记录更新：
-         gatekeeper 曾被短暂 revoke [已修复?]`;
+         gatekeeper 曾被短暂 revoke [已修复?]
+v0.13.0  检测到未注册声纹协议 [来源不明] ／
+         观测到跨层重叠体，无法分层描述 [记录中]`;
