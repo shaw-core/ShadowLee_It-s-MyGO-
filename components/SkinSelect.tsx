@@ -199,14 +199,16 @@ const SkinSelect: React.FC<SkinSelectProps> = ({ currentSkin, novusUnlocked, rec
   const next = () => setIndex(i => (i + 1) % displayList.length);
 
   return (
-    <div className="w-full h-screen flex flex-col items-center bg-[#FEF7CD] text-blue-900 font-pixel relative overflow-y-auto">
+    <div className="w-full h-[100dvh] flex flex-col items-center bg-paper text-ink relative overflow-y-auto scroll-thin">
+      <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'radial-gradient(rgba(30,58,138,.09) 1.2px, transparent 1.4px)', backgroundSize: '14px 14px' }} />
       <button onClick={onBack}
-        className="absolute top-6 left-6 flex items-center text-blue-600 hover:text-blue-900 bg-white border-4 border-blue-200 px-4 py-2 hover:border-blue-500 shadow-md z-10">
-        <ArrowLeft className="mr-2" size={18} /> 返回
+        className="btn absolute top-5 left-5 px-3 py-2 text-sm z-10">
+        <ArrowLeft size={16} /> 返回
       </button>
 
       <div className="my-auto flex flex-col items-center py-16">
-      <h1 className="text-2xl md:text-3xl font-bold text-pink-500 drop-shadow-[2px_2px_0_#fff] mb-2">选择外观</h1>
+      <h1 className="font-display text-4xl md:text-5xl text-sakura mb-3" style={{ WebkitTextStroke: '7px #fff', paintOrder: 'stroke fill' }}>选择外观</h1>
+      <p className="text-xs text-ink/60 -mt-1 mb-3">每一套外观都有自己的能力，只在第二章生效。</p>
       {recommendSkin2 && (
         <p className="mb-3 px-4 py-1.5 bg-white border-2 border-red-400 text-sm font-bold text-red-600 animate-pulse">
           ★ 推荐选择：<span className="font-extrabold underline">电视头小豆</span> —— 二周目的隐藏结局需要她
@@ -215,29 +217,29 @@ const SkinSelect: React.FC<SkinSelectProps> = ({ currentSkin, novusUnlocked, rec
 
       <div className="flex items-center gap-4 md:gap-8">
         <button onClick={prev}
-          className="p-3 bg-white border-4 border-blue-300 hover:border-pink-400 hover:text-pink-500 shadow-[4px_4px_0_0_#93c5fd] active:translate-y-1 active:shadow-none">
-          <ChevronLeft size={28} />
+          className="btn w-12 h-12" aria-label="上一个">
+          <ChevronLeft size={26} />
         </button>
 
-        <div className="bg-white border-4 border-blue-300 retro-border shadow-[8px_8px_0_0_#93c5fd] p-4 flex flex-col items-center">
+        <div className="relative bg-white border-[3px] border-ink p-4 flex flex-col items-center" style={{ boxShadow: '8px 8px 0 0 #1e3a8a' }}>
           {isLocked ? (
             <div className="bg-gradient-to-b from-[#2a2438] to-[#443a5c] flex flex-col items-center justify-center text-white/80" style={{ width: 'min(60vw, 34vh, 300px)', aspectRatio: '320/380' }}>
               <span className="text-7xl font-bold mb-4">???</span>
-              <span className="text-sm px-6 text-center leading-relaxed">在「后编 · 多边形篇」中<br/>集齐全部薄荷糖（碎片）解锁</span>
+              <span className="text-sm px-6 text-center leading-relaxed">在第二章中<br/>集齐全部薄荷糖解锁</span>
             </div>
           ) : (
-            <canvas ref={canvasRef} width={320} height={380} className="bg-gradient-to-b from-[#e8f4ff] to-[#FEF7CD] h-auto" style={{ width: 'min(60vw, 34vh, 300px)' }} />
+            <canvas ref={canvasRef} width={320} height={380} className="h-auto" style={{ width: 'min(60vw, 34vh, 300px)', background: 'radial-gradient(ellipse at 50% 35%, #ffffff 0%, #e6f0ff 55%, #fde7f3 100%)' }} />
           )}
-          <div className="mt-3 text-xl font-bold text-blue-800">{isLocked ? '？？？' : skin.name}</div>
-          <div className="text-sm text-pink-500 mb-2">{isLocked ? '？？？' : skin.vibe}</div>
-          <ul className="text-xs text-blue-600 space-y-1 self-start min-h-[64px]">
+          <div className="mt-3 font-display text-2xl text-ink">{isLocked ? '？？？' : skin.name}</div>
+          <div className="text-sm text-sakura mb-2">{isLocked ? '？？？' : skin.vibe}</div>
+          <ul className="text-xs text-ink/80 space-y-1 self-start min-h-[64px] max-w-[300px]">
             {(isLocked ? ['她好像一直在终点等着谁……'] : skin.features).map(f => <li key={f}>· {f}</li>)}
           </ul>
         </div>
 
         <button onClick={next}
-          className="p-3 bg-white border-4 border-blue-300 hover:border-pink-400 hover:text-pink-500 shadow-[4px_4px_0_0_#93c5fd] active:translate-y-1 active:shadow-none">
-          <ChevronRight size={28} />
+          className="btn w-12 h-12" aria-label="下一个">
+          <ChevronRight size={26} />
         </button>
       </div>
 
@@ -247,8 +249,8 @@ const SkinSelect: React.FC<SkinSelectProps> = ({ currentSkin, novusUnlocked, rec
           const lockedCell = sm.id === 'skinNovus' && !novusUnlocked;
           return (
             <button key={sm.id} onClick={() => setIndex(i)}
-              className={`w-10 h-10 border-4 font-bold ${
-                i === index ? 'bg-pink-500 border-pink-700 text-white' : 'bg-white border-blue-200 text-blue-400 hover:border-blue-400'
+              className={`w-10 h-10 border-[3px] font-bold ${
+                i === index ? 'bg-sakura border-[#9d174d] text-white' : 'bg-white border-ink/30 text-ink/60 hover:border-ink'
               }`}>
               {lockedCell ? '🔒' : sm.id === 'skinNovus' ? '室' : sm.id === 'panda' ? '★' : sm.id === 'yua' ? '🐧' : i + 1}
             </button>
@@ -258,10 +260,10 @@ const SkinSelect: React.FC<SkinSelectProps> = ({ currentSkin, novusUnlocked, rec
 
       <button
         onClick={toggleMic}
-        className={`mt-3 flex items-center px-3 py-1.5 border-2 retro-border font-bold text-xs transition-colors ${
+        className={`mt-3 flex items-center px-3 py-1.5 border-2 font-bold text-xs transition-colors ${
           micOn
             ? 'bg-pink-100 border-pink-400 text-pink-600 animate-pulse'
-            : 'bg-white border-blue-200 text-blue-400 hover:border-pink-300 hover:text-pink-400'
+            : 'bg-white border-ink/25 text-ink/50 hover:border-sakura hover:text-sakura'
         }`}
         title={micOn ? '正在聆听……对这里说出那句话' : '这里好像也能听到声音……'}
       >
@@ -269,10 +271,10 @@ const SkinSelect: React.FC<SkinSelectProps> = ({ currentSkin, novusUnlocked, rec
       </button>
 
       <button onClick={() => !isLocked && !isPanda && !isYua && onConfirm(skin.id as SkinId)} disabled={isLocked || isPanda || isYua}
-        className={`mt-8 flex items-center px-8 py-3 font-bold text-xl border-4 retro-border ${
+        className={`mt-7 flex items-center px-8 py-3 font-display text-2xl border-[3px] ${
           isLocked || isPanda || isYua
-            ? 'bg-gray-300 text-gray-500 border-gray-400 cursor-not-allowed'
-            : 'bg-blue-500 text-white border-blue-700 hover:bg-blue-400 shadow-[4px_4px_0_0_#1e3a8a] hover:translate-y-1 hover:shadow-none'
+            ? 'bg-gray-200 text-gray-500 border-gray-400 cursor-not-allowed'
+            : 'bg-dou text-white border-ink hover:-translate-y-0.5 shadow-[5px_5px_0_0_#1e3a8a] transition-transform'
         }`}>
         <Check className="mr-2" /> {isPanda ? '它不属于任何人' : isYua ? '她会自己决定何时降临' : isLocked ? '尚未解锁' : '就决定是你了！'}
       </button>

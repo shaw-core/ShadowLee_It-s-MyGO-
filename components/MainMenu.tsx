@@ -1,32 +1,129 @@
-import React, { useState, useEffect } from 'react';
-import { BookHeart, Star, X, ImageOff, Sparkles, Shirt, Camera, Music, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect, useRef, useSyncExternalStore } from 'react';
+import { BookHeart, Star, X, ImageOff, Sparkles, Shirt, Camera, Music, ChevronLeft, ChevronRight, AlertTriangle, Settings as Cog, Play, Headphones } from 'lucide-react';
 import { SPECIAL_CG_URL } from '../constants';
 import { GAME_VERSION } from '../version';
+import { useSave } from '../core/save';
+import { walkman, sfx } from '../core/audio';
+import { openWalkman } from './Walkman';
+import { count2D, count3D, ALL_2D_ITEMS, ALL_3D_ITEMS, SPECIAL_CG_ID } from '../core/progress';
+import { LEVELS2D } from '../game2d/levels';
+import { LEVELS3D } from '../game3d/levels3d';
+import { getSprites, novusWave, SPR_W, SPR_H } from '../game2d/sprites';
+import Settings from './ui/Settings';
+import TvHead3D from './TvHead3D';
+
+/** 演出用的满屏雪花噪点（低分辨率画布放大） */
+const Static: React.FC<{ color: string; alpha: number }> = ({ color, alpha }) => {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const c = ref.current!; const g = c.getContext('2d')!;
+    const W = 320, H = 180; c.width = W; c.height = H;
+    const img = g.createImageData(W, H);
+    const [r, gg, b] = color.split(',').map(Number);
+    let raf = 0, f = 0;
+    const loop = () => {
+      if (f++ % 2 === 0) {
+        for (let i = 0; i < W * H; i++) {
+          const v = Math.random();
+          img.data[i * 4] = r; img.data[i * 4 + 1] = gg; img.data[i * 4 + 2] = b;
+          img.data[i * 4 + 3] = v > 0.5 ? v * 255 * alpha * 3 : 0;
+        }
+        // 偶尔一条横向撕裂
+        if (Math.random() < 0.08) { const y = Math.floor(Math.random() * H); for (let x = 0; x < W; x++) img.data[(y * W + x) * 4 + 3] = 255 * alpha * 4; }
+        g.putImageData(img, 0, 0);
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [color, alpha]);
+  return <canvas ref={ref} className="absolute inset-0 w-full h-full pointer-events-none" style={{ imageRendering: 'pixelated' }} />;
+};
 
 interface MainMenuProps {
-  onStart2D: () => void;
-  onStart3D: () => void;
-  onGallery: () => void;
-  onSkinSelect?: () => void;
-  onSecretEnding?: () => void;
-  isGameCleared: boolean;      // 第一章（2D）通关
-  is3DCleared?: boolean;       // 第二章（3D）通关
-  isFullCompletion?: boolean;
-  hasSpecialCG?: boolean;
-  onSpecialCG3D?: () => void;
-  onCheatUnlock?: () => void;
-  bgmName?: string;
-  onPrevBgm?: () => void;
-  onNextBgm?: () => void;
-  systemAnomaly?: boolean;     // 入侵隐藏终端后：世界系统异常
+  onChapter: (ch: 1 | 2) => void;
+  onCodex: () => void;
+  onSkinSelect: () => void;
+  onSecretEnding: () => void;
+  onSpecialCG3D: () => void;
+  onCheatUnlock: () => void;
+  systemAnomaly?: boolean;     // 入侵隐藏终端后：世界系统异常（仅当次会话）
   onDismissAnomaly?: () => void;
 }
 
+/** 标题下的小舞台：豆沙在格子里跑，画面每隔几秒在现实和漫画之间翻一次 */
+const MenuStage: React.FC = () => {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const c = ref.current!; const g = c.getContext('2d')!;
+    g.imageSmoothingEnabled = false;
+    const W = c.width, H = c.height;
+    const prev = document.createElement('canvas'); prev.width = W; prev.height = H;
+    const pg = prev.getContext('2d')!;
+    let x = 40, dir = 1, t = 0, ink = false, wipe = 1, raf = 0, jump = 0, vy = 0;
+    const draw = (ctx: CanvasRenderingContext2D, inkL: boolean) => {
+      const grd = ctx.createLinearGradient(0, 0, 0, H);
+      if (inkL) { grd.addColorStop(0, '#ffffff'); grd.addColorStop(1, '#e9e9ef'); }
+      else { grd.addColorStop(0, '#dbe8ff'); grd.addColorStop(1, '#fde7ef'); }
+      ctx.fillStyle = grd; ctx.fillRect(0, 0, W, H);
+      if (inkL) { ctx.fillStyle = 'rgba(22,24,42,.18)'; for (let yy = 2; yy < H - 14; yy += 4) for (let xx = (yy / 4) % 2 ? 2 : 0; xx < W; xx += 4) ctx.fillRect(xx, yy, 1, 1); }
+      else { for (let i = 0; i < 12; i++) { ctx.fillStyle = ['#fde68a', '#fbcfe8', '#bfdbfe'][i % 3]; ctx.fillRect(10 + i * 26, 8 + Math.round(Math.sin(i) * 3), 2, 3); } }
+      ctx.fillStyle = inkL ? '#16182a' : '#c48f63'; ctx.fillRect(0, H - 12, W, 12);
+      ctx.fillStyle = inkL ? '#ffffff' : '#e8b98a'; ctx.fillRect(0, H - 12, W, 2);
+      const set = getSprites('dousha', inkL);
+      const fr = jump > 0 ? set.frames.jump[0] : set.frames.run[Math.floor(t / 5) % 6];
+      ctx.drawImage(fr[dir > 0 ? 0 : 1], Math.round(x), Math.round(H - 12 - SPR_H + 1 + jump));
+      const nv = Math.abs(x - (W - 50)) < 60 ? novusWave(inkL, Math.floor(t / 14) % 2) : getSprites('novus', inkL).frames.idle[Math.floor(t / 30) % 2][1];
+      ctx.drawImage(nv, W - 50, H - 12 - SPR_H + 1);
+    };
+    const loop = () => {
+      t++;
+      x += dir * 1.1;
+      if (x > W - 90) dir = -1;
+      if (x < 16) dir = 1;
+      if (jump === 0 && t % 90 === 45) vy = -3.2;
+      if (vy !== 0 || jump < 0) { jump += vy; vy += 0.22; if (jump >= 0) { jump = 0; vy = 0; } }
+      if (t % 240 === 0) { pg.drawImage(c, 0, 0); ink = !ink; wipe = 0; }
+      draw(g, ink);
+      if (wipe < 1) {
+        wipe = Math.min(1, wipe + 0.04);
+        const r = wipe * Math.hypot(W, H);
+        g.save(); g.beginPath(); g.rect(0, 0, W, H); g.arc(x + SPR_W / 2, H - 30, r, 0, Math.PI * 2, true); g.clip('evenodd'); g.drawImage(prev, 0, 0); g.restore();
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+  return <canvas ref={ref} width={320} height={64} className="pixel w-full h-auto block" />;
+};
+
+const ChapterCard: React.FC<{ no: string; title: string; sub: string; cleared: boolean; done: number; total: number; got: number; gotTotal: number; pink?: boolean; onClick: () => void }> =
+  ({ no, title, sub, cleared, done, total, got, gotTotal, pink, onClick }) => (
+  <button onClick={() => { sfx('confirm'); onClick(); }} onMouseEnter={() => sfx('hover')}
+    className={`group relative text-left bg-white border-[3px] px-5 pt-4 pb-3 transition-transform hover:-translate-y-1 active:translate-y-0.5 ${pink ? 'border-[#9d174d]' : 'border-ink'}`}
+    style={{ boxShadow: `6px 6px 0 0 ${pink ? '#9d174d' : '#1e3a8a'}` }}>
+    <span className={`absolute -top-4 -left-3 w-11 h-11 flex items-center justify-center font-display text-2xl text-white border-[3px] ${pink ? 'bg-sakura border-[#9d174d]' : 'bg-dou border-ink'} -rotate-6`}>{no}</span>
+    <span className="block pl-7 font-display text-xl md:text-2xl leading-tight" style={{ color: pink ? '#be185d' : '#1e3a8a' }}>
+      {title}{cleared && <Star size={16} className="inline ml-1.5 -mt-1 text-amber-400" fill="currentColor" />}
+    </span>
+    <span className={`block pl-7 text-xs mt-0.5 ${pink ? 'text-pink-500' : 'text-blue-500'}`}>{sub}</span>
+    <span className="flex items-center gap-2 mt-3 text-[11px] font-bold" style={{ color: pink ? '#be185d' : '#1e3a8a' }}>
+      <span className="flex-1 h-2.5 border-2 border-current bg-white overflow-hidden">
+        <span className={`block h-full ${pink ? 'bg-sakura' : 'bg-dou'}`} style={{ width: `${(done / total) * 100}%` }} />
+      </span>
+      <span className="tabular-nums">{done}/{total} 话</span>
+      <span className="opacity-60 tabular-nums">收集 {got}/{gotTotal}</span>
+    </span>
+    <span className={`absolute right-4 top-4 opacity-0 group-hover:opacity-100 transition-opacity ${pink ? 'text-sakura' : 'text-dou'}`}><Play size={18} fill="currentColor" /></span>
+  </button>
+);
+
 const MainMenu: React.FC<MainMenuProps> = ({
-  onStart2D, onStart3D, onGallery, onSkinSelect, onSecretEnding,
-  isGameCleared, is3DCleared, isFullCompletion, hasSpecialCG,
-  onSpecialCG3D, onCheatUnlock, bgmName, onPrevBgm, onNextBgm, systemAnomaly, onDismissAnomaly,
+  onChapter, onCodex, onSkinSelect, onSecretEnding, onSpecialCG3D, onCheatUnlock, systemAnomaly, onDismissAnomaly,
 }) => {
+  const save = useSave();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [showCG, setShowCG] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [clickCount, setClickCount] = useState(0);
@@ -199,14 +296,20 @@ const MainMenu: React.FC<MainMenuProps> = ({
 
   const handleTitleClick = () => {
     setClickCount(prev => prev + 1);
-    if (clickCount + 1 >= 5 && onCheatUnlock) {
+    if (clickCount + 1 >= 5) {
       onCheatUnlock();
       setClickCount(0);
+      sfx('unlock');
     }
   };
 
+  const done1 = LEVELS2D.filter(l => (save.stats[`c1_${l.id}`]?.clears ?? 0) > 0).length;
+  const done2 = LEVELS3D.filter(l => (save.stats[`c2_${l.id}`]?.clears ?? 0) > 0).length;
+  const hasSpecialCG = save.inventory.includes(SPECIAL_CG_ID);
+  const wm = useSyncExternalStore(walkman.subscribe, walkman.getSnapshot);
+
   return (
-    <div className="w-full h-screen flex flex-col items-center bg-[#FEF7CD] text-blue-900 relative overflow-y-auto font-pixel">
+    <div className="w-full h-[100dvh] flex flex-col items-center bg-paper text-ink relative overflow-y-auto overflow-x-hidden scroll-thin">
       <style>{`
         @keyframes anomaly-glitch {
           0%, 86%, 100% { transform: translate(0, 0) skewX(0); opacity: 1; filter: none; }
@@ -219,150 +322,139 @@ const MainMenu: React.FC<MainMenuProps> = ({
         }
         @keyframes anomaly-scan { 0% { top: -10%; } 100% { top: 110%; } }
         @keyframes tv-on {
-          0% { opacity: 0; transform: scale(0.94); filter: drop-shadow(0 0 0 rgba(125,180,255,0)); }
-          100% { opacity: 1; transform: scale(1); filter: drop-shadow(0 0 26px rgba(125,180,255,0.7)); }
+          0% { opacity: 0; transform: scale(0.94); filter: brightness(4) drop-shadow(0 0 0 rgba(125,180,255,0)); }
+          30% { opacity: 1; filter: brightness(2.5) drop-shadow(0 0 30px rgba(125,180,255,0.9)); }
+          100% { opacity: 1; transform: scale(1); filter: brightness(1) drop-shadow(0 0 26px rgba(125,180,255,0.7)); }
         }
+        @keyframes warn-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+        @keyframes slice { 0%, 100% { clip-path: inset(0 0 60% 0); transform: translate(3px,0); } 20% { clip-path: inset(40% 0 30% 0); transform: translate(-4px,0); } 40% { clip-path: inset(70% 0 5% 0); transform: translate(2px,0); } 60% { clip-path: inset(10% 0 75% 0); transform: translate(-2px,0); } 80% { clip-path: inset(55% 0 20% 0); transform: translate(5px,0); } }
         @keyframes tv-breathe {
           0%, 100% { filter: drop-shadow(0 0 18px rgba(125,180,255,0.5)); }
           50% { filter: drop-shadow(0 0 40px rgba(125,180,255,0.9)); }
         }
       `}</style>
 
-      {/* 经典背景装饰 */}
-      <div className="absolute inset-0 z-0 opacity-20 pointer-events-none">
-        <div className="absolute top-0 left-0 w-full h-full manga-pattern opacity-10"></div>
-        <div className="absolute top-1/4 left-1/4 w-32 h-32 bg-blue-300 rounded-full mix-blend-multiply filter blur-xl animate-pulse rect-pixel"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-32 h-32 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl animate-pulse" style={{ animationDelay: '1s' }}></div>
-      </div>
+      {/* 背景：网点 + 两角的速度线 */}
+      <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'radial-gradient(rgba(30,58,138,.10) 1.2px, transparent 1.4px)', backgroundSize: '14px 14px' }} />
+      <div className="absolute -top-24 -left-24 w-[420px] h-[420px] pointer-events-none opacity-60" style={{ background: 'repeating-conic-gradient(from 10deg at 0 0, #bfdbfe 0deg 3deg, transparent 3deg 11deg)', maskImage: 'radial-gradient(circle at 0 0, #000 30%, transparent 70%)' }} />
+      <div className="absolute -bottom-24 -right-24 w-[420px] h-[420px] pointer-events-none opacity-60" style={{ background: 'repeating-conic-gradient(from 10deg at 100% 100%, #fbcfe8 0deg 3deg, transparent 3deg 11deg)', maskImage: 'radial-gradient(circle at 100% 100%, #000 30%, transparent 70%)' }} />
 
-      <div className="z-10 flex flex-col items-center my-auto py-10 w-full px-4">
-        {/* 大标题（经典样式） */}
-        <div className="text-center select-none space-y-4">
-          <h1
-            onClick={handleTitleClick}
-            className="text-4xl md:text-6xl font-bold tracking-tighter text-blue-600 drop-shadow-[4px_4px_0_#fff] cursor-pointer active:scale-95 transition-transform leading-tight"
-            title=""
-          >
+      <div className="z-10 flex flex-col items-center my-auto py-8 w-full max-w-3xl px-5">
+        {/* 大标题 */}
+        <div className="text-center select-none">
+          <h1 onClick={handleTitleClick}
+              className="font-display text-5xl md:text-7xl text-dou cursor-pointer active:scale-95 transition-transform leading-none"
+              style={{ WebkitTextStroke: '10px #fff', paintOrder: 'stroke fill', filter: 'drop-shadow(5px 5px 0 #f9a8d4)' }}>
             李豆沙的次元冲刺
           </h1>
-          <p className="text-lg md:text-xl text-blue-800 font-bold tracking-widest uppercase bg-white px-6 py-2 inline-block border-4 border-blue-200">
-            - 秘密百合漫画册 -
+          <p className="mt-3 inline-block bg-white border-[3px] border-ink px-5 py-1 font-display text-lg md:text-xl text-ink -rotate-1" style={{ boxShadow: '3px 3px 0 0 #1e3a8a' }}>
+            秘密百合漫画册
           </p>
         </div>
 
-        {/* 章节选择 */}
-        <div className="flex flex-col gap-4 w-full max-w-md mt-8">
-          <button
-            onClick={onStart2D}
-            className="group relative flex items-center gap-4 px-5 py-4 bg-white border-4 border-blue-500 retro-border shadow-[6px_6px_0_0_#1e3a8a] hover:translate-x-1 hover:translate-y-1 hover:shadow-[2px_2px_0_0_#1e3a8a] transition-all text-left"
-          >
-            <span className="text-3xl font-bold text-blue-300 group-hover:text-blue-500 transition-colors leading-none">壹</span>
-            <span className="flex flex-col">
-              <span className="text-lg font-bold text-blue-800">第一章 · 漫画的世界{isGameCleared ? ' ★' : ''}</span>
-              <span className="text-xs text-blue-500">被封印在分镜里的两个人 {isGameCleared ? '｜二周目已解锁' : ''}</span>
-            </span>
-            <span className="ml-auto text-blue-300 group-hover:translate-x-1 transition-transform">▶</span>
-          </button>
+        {/* 小舞台 */}
+        <div className="w-full max-w-md mt-6 border-[3px] border-ink-black bg-white p-1 rotate-[0.6deg]" style={{ boxShadow: '4px 4px 0 0 rgba(22,24,42,.25)' }}>
+          <MenuStage />
+        </div>
 
-          <button
-            onClick={onStart3D}
-            className="group relative flex items-center gap-4 px-5 py-4 bg-white border-4 border-pink-500 retro-border shadow-[6px_6px_0_0_#9d174d] hover:translate-x-1 hover:translate-y-1 hover:shadow-[2px_2px_0_0_#9d174d] transition-all text-left"
-          >
-            <span className="text-3xl font-bold text-pink-300 group-hover:text-pink-500 transition-colors leading-none">贰</span>
-            <span className="flex flex-col">
-              <span className="text-lg font-bold text-pink-700">第二章 · 多边形的世界{is3DCleared ? ' ★' : ''}</span>
-              <span className="text-xs text-pink-500">门的另一侧，是多出来的一维 {is3DCleared ? '｜二周目已解锁' : ''}</span>
-            </span>
-            <span className="ml-auto text-pink-300 group-hover:translate-x-1 transition-transform">▶</span>
-          </button>
+        {/* 章节 */}
+        <div className="grid md:grid-cols-2 gap-6 w-full mt-8">
+          <ChapterCard no="壹" title="第一章 · 漫画的世界" sub="被封印在分镜里的两个人"
+            cleared={save.cleared1} done={done1} total={LEVELS2D.length} got={count2D(save)} gotTotal={ALL_2D_ITEMS.length}
+            onClick={() => onChapter(1)} />
+          <ChapterCard no="贰" title="第二章 · 多边形的世界" sub="门的另一侧，是多出来的一维" pink
+            cleared={save.cleared2} done={done2} total={LEVELS3D.length} got={count3D(save)} gotTotal={ALL_3D_ITEMS.length}
+            onClick={() => onChapter(2)} />
+        </div>
 
-          {/* 次级功能 */}
-          <div className="grid grid-cols-2 gap-3 mt-1">
-            <button onClick={onGallery}
-              className="flex items-center justify-center px-3 py-2.5 bg-white border-4 border-blue-500 text-blue-600 font-bold text-sm hover:bg-pink-50 hover:border-pink-400 hover:text-pink-500 retro-border shadow-[3px_3px_0_0_#93c5fd] hover:translate-y-0.5 hover:shadow-none transition-all">
-              <BookHeart className="mr-1.5" size={16} /> 记忆图鉴
-            </button>
-            {onSkinSelect && (
-              <button onClick={onSkinSelect}
-                className="flex items-center justify-center px-3 py-2.5 bg-white border-4 border-blue-500 text-blue-600 font-bold text-sm hover:bg-blue-50 hover:border-blue-400 retro-border shadow-[3px_3px_0_0_#93c5fd] hover:translate-y-0.5 hover:shadow-none transition-all">
-                <Shirt className="mr-1.5" size={16} /> 外观选择
-              </button>
-            )}
-            {is3DCleared && onSpecialCG3D && (
-              <button onClick={onSpecialCG3D}
-                className="flex items-center justify-center px-3 py-2.5 bg-orange-400 border-4 border-orange-600 text-white font-bold text-sm hover:bg-orange-300 retro-border shadow-[3px_3px_0_0_#9a3412] hover:translate-y-0.5 hover:shadow-none transition-all">
-                <Camera className="mr-1.5" size={16} /> 后编合影
-              </button>
-            )}
-            {hasSpecialCG && (
-              <button onClick={() => { setShowCG(true); setImgError(false); }}
-                className="flex items-center justify-center px-3 py-2.5 bg-pink-500 border-4 border-pink-700 text-white font-bold text-sm hover:bg-pink-400 retro-border shadow-[3px_3px_0_0_#be185d] hover:translate-y-0.5 hover:shadow-none transition-all animate-pulse">
-                <Star className="mr-1.5" size={16} /> 特别回顾
-              </button>
-            )}
-          </div>
-
-          {/* BGM 选择器 */}
-          {bgmName && (
-            <div className="flex items-center justify-between px-3 py-2 bg-white border-4 border-blue-200 retro-border mt-1">
-              <span className="flex items-center text-blue-500 text-xs font-bold"><Music size={14} className="mr-1.5" /> BGM</span>
-              <div className="flex items-center gap-2">
-                <button onClick={onPrevBgm} className="text-blue-400 hover:text-pink-500 p-0.5"><ChevronLeft size={16} /></button>
-                <span className="text-xs font-bold text-blue-700 min-w-[130px] text-center">{bgmName}</span>
-                <button onClick={onNextBgm} className="text-blue-400 hover:text-pink-500 p-0.5"><ChevronRight size={16} /></button>
-              </div>
-            </div>
+        {/* 次级功能 */}
+        <div className="flex flex-wrap justify-center gap-3 mt-7">
+          <button className="btn px-4 py-2 text-sm" onClick={() => { sfx('click'); onCodex(); }}><BookHeart size={16} />豆沙的手账</button>
+          <button className="btn px-4 py-2 text-sm" onClick={() => { sfx('click'); onSkinSelect(); }}><Shirt size={16} />外观</button>
+          <button className="btn px-4 py-2 text-sm" onClick={() => { sfx('click'); setSettingsOpen(true); }}><Cog size={16} />设置</button>
+          {save.cleared2 && (
+            <button className="btn px-4 py-2 text-sm text-white" style={{ background: '#fb923c', borderColor: '#9a3412', boxShadow: '4px 4px 0 0 #9a3412' }}
+              onClick={() => { sfx('click'); onSpecialCG3D(); }}><Camera size={16} />后编合影</button>
+          )}
+          {hasSpecialCG && (
+            <button className="btn btn-pink px-4 py-2 text-sm" onClick={() => { sfx('click'); setShowCG(true); setImgError(false); }}><Star size={16} />特别回顾</button>
           )}
         </div>
+
+        {/* 随身听：原来的 BGM 选择换成了一个小道具 */}
+        <button onClick={() => openWalkman()}
+                className="flex items-center gap-2 mt-6 px-3 py-1.5 bg-white/80 border-2 border-ink/30 hover:border-ink text-xs font-bold rounded-full transition-colors">
+          <Headphones size={14} className="text-sakura" />
+          <span>{wm.playing ? `随身听 · ${walkman.tracks[wm.idx].name}` : '掏出随身听'}</span>
+          <kbd className="ml-1 px-1 border border-ink/30 rounded text-[10px] text-ink/50">M</kbd>
+        </button>
       </div>
 
       {/* 底栏 */}
-      <div className="z-10 w-full flex items-center justify-between px-6 pb-4 text-[10px] md:text-xs text-blue-400">
+      <div className="z-10 w-full flex items-center justify-between px-6 pb-4 text-[10px] md:text-xs text-ink/50">
         <span>{GAME_VERSION}</span>
-        <span className="animate-pulse">按 [Q] 键切换现实与线框</span>
-        <span className="opacity-60">© ShadowLee</span>
+        <span>方向键移动 · 空格跳 · Q 切换图层</span>
+        <span>© ShadowLee</span>
       </div>
 
-      {/* 隐藏结局入口 */}
-      {isGameCleared && onSecretEnding && (
+      {/* 真结局入口：通关第一章就能进（第一章只有 2D 房间，通关第二章后可以切到 3D） */}
+      {save.cleared1 && (
         <button
-          onClick={isFullCompletion ? onSecretEnding : undefined}
-          className={`absolute bottom-10 right-8 transition-transform hover:scale-110 flex flex-col items-center z-10 ${
-            isFullCompletion ? 'text-blue-400 hover:text-blue-600 animate-pulse cursor-pointer' : 'text-gray-300 cursor-not-allowed opacity-50'
-          }`}
-          title={isFullCompletion ? '进入真结局' : '需要100%收集'}
+          onClick={() => { sfx('confirm'); onSecretEnding(); }}
+          className="absolute bottom-12 right-8 transition-transform hover:scale-110 flex flex-col items-center z-10 text-dou cursor-pointer"
+          title="回到她们的房间"
         >
-          <Sparkles size={32} fill="currentColor" />
-          {!isFullCompletion && <span className="text-[10px] mt-1 font-bold">???</span>}
+          <Sparkles size={32} fill="currentColor" className="animate-pulse" />
+          <span className="text-[10px] mt-1 font-bold">她们的房间</span>
         </button>
       )}
 
-      {/* 世界系统异常：全屏警告（入侵隐藏终端后出现） */}
-      {systemAnomaly && seq === 'idle' && (
-        <div className="fixed inset-0 z-[90] bg-black/75 flex items-center justify-center p-6">
-          <div className="relative w-full max-w-xl border-4 border-red-500 bg-red-950/80 backdrop-blur-sm text-red-400 px-8 py-8 overflow-hidden"
-               style={{ animation: 'anomaly-glitch 2.4s linear infinite', boxShadow: '0 0 40px rgba(220,38,38,0.55), inset 0 0 30px rgba(220,38,38,0.2)' }}>
-            {/* 扫描线 */}
-            <div className="absolute left-0 w-full h-8 bg-red-500/10 pointer-events-none"
-                 style={{ animation: 'anomaly-scan 2.8s linear infinite' }} />
-            <div className="absolute inset-0 pointer-events-none opacity-30"
-                 style={{ background: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.4) 0px, rgba(0,0,0,0.4) 1px, transparent 1px, transparent 3px)' }} />
+      {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} />}
 
-            <div className="flex items-center justify-center font-bold text-2xl md:text-3xl mb-4 tracking-wider"
-                 style={{ textShadow: '2px 0 0 rgba(0,255,255,0.5), -2px 0 0 rgba(255,0,0,0.7)' }}>
-              <AlertTriangle size={32} className="mr-3 animate-pulse" /> WORLD SYSTEM WARNING
+      {/* 世界系统异常：整个标题页被接管（只在本次会话出现） */}
+      {systemAnomaly && seq === 'idle' && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center p-5 overflow-hidden"
+             style={{ backdropFilter: 'grayscale(1) contrast(1.25) blur(2px)', WebkitBackdropFilter: 'grayscale(1) contrast(1.25) blur(2px)', background: 'radial-gradient(ellipse at center, rgba(40,0,6,.55) 0%, rgba(8,0,2,.88) 70%)' }}>
+          <Static color="255,60,80" alpha={0.035} />
+          {/* 上下警示带 */}
+          {(['top-0', 'bottom-0'] as const).map(pos => (
+            <div key={pos} className={`absolute inset-x-0 ${pos} h-7 overflow-hidden`} style={{ background: 'repeating-linear-gradient(-45deg, #ff3b4f 0 16px, #1a0004 16px 32px)', opacity: 0.85 }}>
+              <div className="absolute inset-0 flex items-center whitespace-nowrap font-mono text-[11px] font-bold tracking-[0.4em] text-white/90" style={{ animation: 'warn-marquee 14s linear infinite' }}>
+                {'WORLD INTEGRITY CHECK FAILED  ·  '.repeat(12)}
+              </div>
             </div>
-            <div className="font-mono text-sm md:text-base leading-loose text-center text-red-300">
-              世界完整性校验失败<br />
-              检测到未授权访问痕迹 —— 权限等级：TVHEAD_ADMIN<br />
-              [P.A.N.D.A.] 监察进程已被唤醒<br />
-              <span className="opacity-60 text-xs">该事件将被记录，并同步至更高一层。</span>
-            </div>
-            <div className="mt-6 flex justify-center">
-              <button onClick={() => { ensureSeqCtx(); setSeq('denied'); }}
-                className="border-2 border-red-400 px-8 py-2 font-mono font-bold tracking-[0.3em] text-red-300 hover:bg-red-500 hover:text-black transition-colors">
-                [ 确认 ]
-              </button>
+          ))}
+          <div className="relative w-full max-w-xl" style={{ animation: 'anomaly-glitch 2.4s linear infinite' }}>
+            <div className="relative bg-[#16020a]/90 border border-[#ff3b4f]/70 overflow-hidden"
+                 style={{ boxShadow: '0 0 0 1px rgba(0,0,0,.6), 0 0 60px rgba(255,59,79,.35), inset 0 0 40px rgba(255,59,79,.12)' }}>
+              <div className="absolute left-0 inset-y-0 w-1.5 bg-[#ff3b4f]" />
+              <div className="absolute left-0 w-full h-10 bg-[#ff3b4f]/10 pointer-events-none" style={{ animation: 'anomaly-scan 2.8s linear infinite' }} />
+              <div className="absolute inset-0 pointer-events-none opacity-30" style={{ background: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.45) 0px, rgba(0,0,0,0.45) 1px, transparent 1px, transparent 3px)' }} />
+              <div className="flex items-center gap-3 px-7 pt-6 pb-1 font-mono text-[11px] tracking-[0.3em] text-[#ff8a96]/70">
+                <span className="w-2 h-2 rounded-full bg-[#ff3b4f] animate-pulse" />SYS · 0x7F · INTEGRITY
+              </div>
+              <div className="relative px-7 pb-2">
+                <div className="relative font-mono font-bold text-2xl md:text-[34px] tracking-wider text-[#ff4d5f] flex items-center gap-3">
+                  <AlertTriangle size={30} className="shrink-0 animate-pulse" />
+                  <span className="relative">
+                    WORLD SYSTEM WARNING
+                    <span aria-hidden className="absolute inset-0 text-cyan-300/50" style={{ transform: 'translate(2px,0)', clipPath: 'inset(0 0 55% 0)', animation: 'slice 2.6s steps(1) infinite' }}>WORLD SYSTEM WARNING</span>
+                  </span>
+                </div>
+              </div>
+              <div className="px-7 pb-2 font-mono text-sm md:text-[15px] leading-loose text-[#ffb3bb]">
+                世界完整性校验失败<br />
+                检测到未授权访问痕迹 —— 权限等级：TVHEAD_ADMIN<br />
+                [P.A.N.D.A.] 监察进程已被唤醒<br />
+                <span className="opacity-60 text-xs">该事件将被记录，并同步至更高一层。</span>
+              </div>
+              <div className="px-7 pt-3 pb-7 flex justify-end">
+                <button onClick={() => { ensureSeqCtx(); setSeq('denied'); }}
+                  className="group relative px-8 py-2.5 font-mono font-bold tracking-[0.35em] text-[#ffb3bb] border border-[#ff4d5f] overflow-hidden">
+                  <span className="absolute inset-0 bg-[#ff4d5f] origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-150" />
+                  <span className="relative group-hover:text-black">[ 确认 ]</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -370,59 +462,64 @@ const MainMenu: React.FC<MainMenuProps> = ({
 
       {/* ===== 隐藏结局后的标题页演出 ===== */}
       {seq === 'denied' && (
-        <div className="fixed inset-0 z-[95] bg-black flex flex-col items-center justify-center select-none cursor-default"
+        <div className="fixed inset-0 z-[95] bg-[#050002] flex flex-col items-center justify-center select-none cursor-default overflow-hidden"
              onClick={() => setDeniedClicks(c => c + 1)}>
-          <div className="text-red-600 font-bold text-6xl md:text-8xl tracking-[0.2em]"
-               style={{ animation: 'anomaly-glitch 2.2s linear infinite', textShadow: '3px 0 0 rgba(0,255,255,0.4), -3px 0 0 rgba(255,0,0,0.6)' }}>
+          <Static color="255,40,60" alpha={0.05} />
+          <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,.85) 100%)' }} />
+          <div className="relative font-bold text-6xl md:text-9xl tracking-[0.2em] text-[#e0102a]"
+               style={{ animation: 'anomaly-glitch 2.2s linear infinite', textShadow: '0 0 40px rgba(224,16,42,.55)' }}>
             禁止进入
+            <span aria-hidden className="absolute inset-0 text-cyan-300/40" style={{ transform: 'translate(4px,0)', clipPath: 'inset(0 0 60% 0)', animation: 'slice 1.9s steps(1) infinite' }}>禁止进入</span>
+            <span aria-hidden className="absolute inset-0 text-red-300/50" style={{ transform: 'translate(-5px,0)', clipPath: 'inset(62% 0 0 0)', animation: 'slice 2.3s steps(1) infinite reverse' }}>禁止进入</span>
           </div>
-          <div className="mt-6 font-mono text-red-800 text-sm tracking-[0.5em]">ACCESS RESTRICTED</div>
+          <div className="relative mt-8 flex items-center gap-4 font-mono text-[#ff3b4f]/70 text-xs md:text-sm tracking-[0.5em]">
+            <span className="w-10 h-px bg-current" />ACCESS RESTRICTED<span className="w-10 h-px bg-current" />
+          </div>
         </div>
       )}
 
       {seq === 'tvhead' && (
-        <div className="fixed inset-0 z-[95] bg-black flex flex-col items-center justify-center select-none overflow-hidden px-4">
-          {/* 电视头：亮起后轻微呼吸光 */}
-          <div className="relative w-60 h-40 md:w-72 md:h-48 bg-[#15181f] rounded-xl border-4 border-[#3a4152] shrink-0"
-               style={{ animation: 'tv-on 0.7s ease-out forwards, tv-breathe 3s ease-in-out 0.7s infinite' }}>
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-5">
-              <div className="flex gap-8">
-                <div className="w-14 h-3.5 md:w-16 md:h-4 rounded-full bg-[#7db4ff]" />
-                <div className="w-14 h-3.5 md:w-16 md:h-4 rounded-full bg-[#7db4ff]" />
-              </div>
-              <svg width="76" height="28" viewBox="0 0 90 34">
-                <path d="M 8 8 A 16 16 0 0 0 44 8" fill="none" stroke="#7db4ff" strokeWidth="8" strokeLinecap="round" />
-                <path d="M 46 8 A 16 16 0 0 0 82 8" fill="none" stroke="#7db4ff" strokeWidth="8" strokeLinecap="round" />
-              </svg>
-            </div>
-            <div className="absolute inset-0 rounded-lg pointer-events-none opacity-30"
-                 style={{ background: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.5) 0px, rgba(0,0,0,0.5) 1px, transparent 1px, transparent 3px)' }} />
+        <div className="fixed inset-0 z-[95] bg-[#02040a] flex flex-col items-center justify-center select-none overflow-hidden px-4 gap-2">
+          <Static color="125,180,255" alpha={0.025} />
+          <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse at 50% 35%, rgba(60,110,200,.22) 0%, transparent 55%)' }} />
+          {/* 电视头：第二章的体素模型，亮起后轻轻呼吸 */}
+          <div className="relative shrink-0" style={{ animation: 'tv-on 0.7s ease-out forwards, tv-breathe 3s ease-in-out 0.7s infinite' }}>
+            <TvHead3D size={240} />
           </div>
           {/* 小豆的蓝色终端 */}
-          <div className="w-full max-w-xl mt-6 font-mono text-[12px] md:text-sm leading-relaxed text-[#7db4ff]"
-               style={{ textShadow: '0 0 8px rgba(125,180,255,0.5)' }}>
-            {hackTyped.map((line, i) => (
-              <div key={i} className="whitespace-pre-wrap min-h-[1.4em]">{line}</div>
-            ))}
-            {hackProgress !== null && (
-              <div className="flex items-center gap-3 my-1">
-                <span className="shrink-0">{'  revoking'}</span>
-                <div className="flex-1 h-3.5 border max-w-[260px]" style={{ borderColor: '#7db4ff' }}>
-                  <div className="h-full" style={{ width: `${hackProgress}%`, background: '#7db4ff', boxShadow: '0 0 10px rgba(125,180,255,0.8)' }} />
+          <div className="relative w-full max-w-xl border border-[#7db4ff]/40 bg-[#040a18]/85"
+               style={{ boxShadow: '0 0 40px rgba(125,180,255,.18), inset 0 0 30px rgba(125,180,255,.06)' }}>
+            <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[#7db4ff]/30 font-mono text-[11px] text-[#7db4ff]/70">
+              <span className="w-2 h-2 rounded-full bg-[#7db4ff]/70" />tvhead@panda-gatekeeper<span className="ml-auto">tty1</span>
+            </div>
+            <div className="px-4 py-3 font-mono text-[12px] md:text-sm leading-relaxed text-[#9cc6ff] min-h-[14rem]"
+                 style={{ textShadow: '0 0 8px rgba(125,180,255,0.5)' }}>
+              {hackTyped.map((line, i) => (
+                <div key={i} className="whitespace-pre-wrap min-h-[1.4em]"
+                     style={{ color: line.includes('ACCESS BAN LIFTED') ? '#e6f1ff' : line.startsWith('  ●') ? '#ffb3bb' : line.includes('OK') ? '#b7f5d0' : undefined, fontWeight: line.includes('ACCESS BAN LIFTED') ? 700 : undefined }}>
+                  {line}
                 </div>
-                <span className="w-10 text-right">{hackProgress}%</span>
-              </div>
-            )}
-            {hackCur !== '' && (
-              <div className="whitespace-pre-wrap min-h-[1.4em]">
-                {hackCur}<span style={{ animation: 'cursor-blink 1s step-end infinite' }}>█</span>
-              </div>
-            )}
-            {hackCur === '' && hackProgress === null && (
-              <span style={{ animation: 'cursor-blink 1s step-end infinite' }}>█</span>
-            )}
+              ))}
+              {hackProgress !== null && (
+                <div className="flex items-center gap-3 my-1">
+                  <span className="shrink-0">{'  revoking'}</span>
+                  <div className="flex-1 h-3.5 border max-w-[260px] overflow-hidden" style={{ borderColor: '#7db4ff' }}>
+                    <div className="h-full" style={{ width: `${hackProgress}%`, background: 'repeating-linear-gradient(90deg, #7db4ff 0 6px, rgba(125,180,255,.55) 6px 8px)', boxShadow: '0 0 10px rgba(125,180,255,0.8)' }} />
+                  </div>
+                  <span className="w-10 text-right tabular-nums">{hackProgress}%</span>
+                </div>
+              )}
+              {hackCur !== '' && (
+                <div className="whitespace-pre-wrap min-h-[1.4em]">
+                  {hackCur}<span style={{ animation: 'cursor-blink 1s step-end infinite' }}>█</span>
+                </div>
+              )}
+              {hackCur === '' && hackProgress === null && (
+                <span style={{ animation: 'cursor-blink 1s step-end infinite' }}>█</span>
+              )}
+            </div>
+            <div className="absolute inset-0 pointer-events-none opacity-25" style={{ background: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.5) 0px, rgba(0,0,0,0.5) 1px, transparent 1px, transparent 3px)' }} />
           </div>
-          <style>{`@keyframes cursor-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }`}</style>
         </div>
       )}
 

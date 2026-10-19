@@ -1,0 +1,159 @@
+@import "tailwindcss";
+
+@theme {
+  --color-paper: #FEF7CD;
+  --color-paper-2: #fffbe6;
+  --color-ink: #1e3a8a;
+  --color-ink-black: #16182a;
+  --color-dou: #2563eb;
+  --color-sky: #93c5fd;
+  --color-sakura: #ec4899;
+  --color-sakura-soft: #fbcfe8;
+  --color-orange-novus: #ea580c;
+  --font-display: "ZCOOL KuaiLe", "Noto Sans SC", sans-serif;
+  --font-body: "Noto Sans SC", system-ui, sans-serif;
+  --font-hand: "Long Cang", "ZCOOL KuaiLe", "Noto Sans SC", cursive;
+}
+
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+canvas.pixel { image-rendering: pixelated; image-rendering: crisp-edges; }
+
+/* ---------- 旧版沿用的像素描边（玩家熟悉的按钮手感） ---------- */
+.retro-border {
+  box-shadow: -4px 0 0 0 white, 4px 0 0 0 white, 0 -4px 0 0 white, 0 4px 0 0 white;
+  margin: 4px;
+}
+
+/* ---------- 网点（screentone） ---------- */
+.tone {
+  background-image: radial-gradient(currentColor 22%, transparent 24%);
+  background-size: 6px 6px;
+}
+.tone-fine {
+  background-image: radial-gradient(currentColor 20%, transparent 22%);
+  background-size: 4px 4px;
+}
+.manga-pattern {
+  background-image: radial-gradient(#000 15%, transparent 16%), radial-gradient(#000 15%, transparent 16%);
+  background-size: 8px 8px;
+  background-position: 0 0, 4px 4px;
+}
+
+/* ---------- 漫画分镜框 ---------- */
+.panel {
+  background: #fff;
+  border: 3px solid var(--color-ink-black);
+  box-shadow: 5px 5px 0 0 var(--color-ink-black);
+}
+.panel-blue {
+  background: #fff;
+  border: 3px solid var(--color-ink);
+  box-shadow: 5px 5px 0 0 var(--color-ink);
+}
+
+/* ---------- 按钮：贴纸 + 硬阴影 ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+  font-weight: 700;
+  border: 3px solid var(--color-ink);
+  background: #fff; color: var(--color-ink);
+  box-shadow: 4px 4px 0 0 var(--color-ink);
+  transition: transform .08s ease, box-shadow .08s ease, background .15s ease;
+  cursor: pointer;
+}
+.btn:hover { background: #fdf2f8; }
+.btn:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 0 var(--color-ink); }
+.btn:focus-visible { outline: 3px dashed var(--color-sakura); outline-offset: 3px; }
+.btn[disabled] { opacity: .45; cursor: not-allowed; transform: none; box-shadow: 4px 4px 0 0 var(--color-ink); }
+.btn-pink { background: var(--color-sakura); color: #fff; border-color: #9d174d; box-shadow: 4px 4px 0 0 #9d174d; }
+.btn-pink:hover { background: #f472b6; }
+.btn-blue { background: var(--color-dou); color: #fff; border-color: var(--color-ink); }
+.btn-blue:hover { background: #3b82f6; }
+
+/* ---------- 手写纸条 ---------- */
+.paper-note {
+  background:
+    repeating-linear-gradient(180deg, transparent 0 35px, rgba(30,58,138,.12) 35px 36px),
+    #fffdf3;
+  font-family: var(--font-hand);
+  color: #3b2f1e;
+  box-shadow: 0 10px 30px rgba(0,0,0,.25), 0 0 0 1px rgba(0,0,0,.06);
+}
+.tape::before {
+  content: ''; position: absolute; top: -12px; left: 50%; width: 90px; height: 24px;
+  transform: translateX(-50%) rotate(-3deg);
+  background: rgba(253, 224, 71, .55);
+  box-shadow: 0 1px 2px rgba(0,0,0,.1);
+}
+
+/* ---------- 动画 ---------- */
+@keyframes float-y { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes blink-caret { 0%,49% { opacity: 1; } 50%,100% { opacity: 0; } }
+@keyframes pop-in { 0% { transform: scale(.6); opacity: 0; } 70% { transform: scale(1.06); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes slide-up { from { transform: translateY(16px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ink-wipe { from { clip-path: circle(0% at 50% 50%); } to { clip-path: circle(80% at 50% 50%); } }
+@keyframes shake-x { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+@keyframes cursor-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+@keyframes danmaku-fly { from { left: 100%; } to { left: -60%; } }
+@keyframes tear-l { to { transform: translate(-30%, 8%) rotate(-8deg); opacity: 0; } }
+@keyframes tear-r { to { transform: translate(30%, 6%) rotate(7deg); opacity: 0; } }
+@keyframes shard-fly { 0% { transform: none; opacity: 1; } 15% { transform: translate(calc(var(--dx) * .1), -6px) rotate(calc(var(--rot) * .1)); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); opacity: 0; } }
+@keyframes kb-drift { from { transform: scale(1.02) translate(0,0); } to { transform: scale(1.09) translate(-1.5%,-1%); } }
+@keyframes eq-bar { from { height: 3px; } to { height: 12px; } }
+@keyframes marquee-x { 0%, 15% { transform: translateX(0); } 85%, 100% { transform: translateX(calc(-100% + 230px)); } }
+@media (prefers-reduced-motion: reduce) { .kb-img { animation: none !important; } }
+@keyframes float-slow { 0%,100% { transform: translateY(0) rotate(var(--r,0deg)); } 50% { transform: translateY(-10px) rotate(var(--r,0deg)); } }
+.anim-pop { animation: pop-in .35s cubic-bezier(.2,.9,.3,1.2) both; }
+.anim-up { animation: slide-up .3s ease-out both; }
+.anim-fade { animation: fade-in .4s ease-out both; }
+.caret { animation: blink-caret 1s step-end infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+/* 细滚动条 */
+.scroll-thin::-webkit-scrollbar { width: 8px; }
+.scroll-thin::-webkit-scrollbar-thumb { background: rgba(30,58,138,.35); border-radius: 4px; }
+
+/* ---------- 第二章：3D 场景里的文字标签 ---------- */
+.wire-label {
+  font: 600 11px/1.3 ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color: #e8ecff; background: rgba(12, 14, 22, .78);
+  border: 1px solid rgba(232, 236, 255, .55); padding: 1px 6px;
+  white-space: nowrap; letter-spacing: .06em;
+}
+.wire-label-blue { color: #9cc6ff; border-color: rgba(125, 180, 255, .7); }
+.wire-label-warm { color: #ffd2a8; border-color: rgba(255, 178, 122, .7); }
+.note-label {
+  font-family: var(--font-hand); font-size: 19px; line-height: 1.25; color: #3b2f2a;
+  background: #fffbe6; border: 2px solid #16182a; padding: 4px 12px;
+  box-shadow: 3px 3px 0 rgba(22, 24, 42, .22); white-space: nowrap;
+}
+.note-label.note-label-wire {
+  font: 500 12px/1.4 ui-monospace, Menlo, monospace; color: #cfd6ff;
+  background: rgba(12, 14, 22, .8); border: 1px solid rgba(207, 214, 255, .45); box-shadow: none;
+}
+.note-label.note-label-wire::before { content: "// "; opacity: .6; }
+.bark-bubble {
+  position: relative; max-width: 220px; padding: 6px 12px;
+  font: 700 14px/1.4 var(--font-body); color: #3b2318;
+  background: #fff; border: 2.5px solid #3b2318; border-radius: 14px;
+  white-space: normal; text-align: center;
+}
+.bark-bubble::after {
+  content: ""; position: absolute; left: 50%; bottom: -8px; width: 12px; height: 12px;
+  background: #fff; border-right: 2.5px solid #3b2318; border-bottom: 2.5px solid #3b2318;
+  transform: translateX(-50%) rotate(45deg);
+}

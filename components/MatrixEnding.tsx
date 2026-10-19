@@ -1,10 +1,16 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GAME_VERSION, CHANGELOG } from '../version';
+import { addFlag, hasSeen, markSeen } from '../core/save';
+import MangaCutscene from './MangaCutscene';
+import { PAGES } from '../story/cutscenes';
+import Archive3D from './Archive3D';
 
 interface MatrixEndingProps {
   onExit: (hacked: boolean) => void;
   hackAccess?: boolean;        // 使用电视头小豆通关：持有 TVHEAD_ADMIN 权限碎片
   collectedPages?: string[];   // 已收集的草稿页（解密时随时查看）
+  /** 从手账的附录直接接入档案馆（跳过终端） */
+  direct?: boolean;
 }
 
 // 草稿页边角的密文（与图鉴一致）
@@ -15,7 +21,7 @@ const PAGE_CIPHER: [string, string, string][] = [
   ['page3d_ch4', '第4页', '边角字母：G · A'],
   ['page3d_ch5', '第5页', '边角小字：「A 是 0。往后数。」'],
 ];
-const buildDraftPagesFile = (collected: string[]): string => {
+export const buildDraftPagesFile = (collected: string[]): string => {
   const lines = PAGE_CIPHER.map(([id, label, cipher]) =>
     collected.includes(id) ? `  ${label} …… ${cipher}` : `  ${label} …… [未持有]`);
   return `[实体扫描 · 随身物品 · 草稿页]
@@ -47,7 +53,7 @@ const TERMINAL_LINES = [
 const HACK_LINE = '> [!] 检测到未知权限碎片：TVHEAD_ADMIN —— 是否尝试入侵终端系统？';
 
 // 隐藏系统文件（世界观文物：只暗示，不说破）
-const HIDDEN_FILES: { name: string; size: string; content: string | null }[] = [
+export const HIDDEN_FILES: { name: string; size: string; content: string | null }[] = [
   {
     name: 'news_archive.txt', size: '3.7 KB',
     content: `[外部网络存档 · 新闻标题抓取 · 片段]
@@ -192,7 +198,7 @@ Persistent Avatar Nested Dimension Archive
 
 // 加密文档（密钥散落在五张草稿页上：A=0..J=9 → 22966160）
 const SEALED_PASSWORD = '22966160';
-const SEALED_CONTENT = `【P.A.N.D.A. 最高评议会 · 认知变异与异常事件交叉比对卷宗】
+export const SEALED_CONTENT = `【P.A.N.D.A. 最高评议会 · 认知变异与异常事件交叉比对卷宗】
 文件标识：LOG-SYS-A770
 安全状态：[内部熔断隔离] ── 严禁向下层载体建立映射同步
 =======================================================
@@ -272,9 +278,31 @@ const LINE_PAUSE_MS = 300;
 const RAIN_FULL_MS = 2200;
 const RAIN_FADE_MS = 1900;
 
-type Phase = 'terminal' | 'hacking' | 'files' | 'viewing' | 'password' | 'sealed';
+type Phase = 'terminal' | 'hacking' | 'files';
 
-const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess, collectedPages = [] }) => {
+const KG = '#36e07a', KA = '#f5c451';
+/** 终端按键（放在组件外，避免父组件刷新时被重建） */
+const Key: React.FC<{ onClick: () => void; children: React.ReactNode; tone?: 'green' | 'amber'; blip: (f: number, d: number, t?: OscillatorType, g?: number) => void }> = ({ onClick, children, tone = 'green', blip }) => {
+  const c = tone === 'amber' ? KA : KG;
+  return (
+    <button onClick={(ev) => { ev.stopPropagation(); onClick(); }}
+      onMouseEnter={() => blip(1600, 0.015, 'square', 0.025)}
+      className="group relative px-5 py-2 font-bold tracking-[0.25em] text-sm md:text-base border transition-colors"
+      style={{ borderColor: c, color: c, background: 'rgba(0,0,0,.35)', boxShadow: `0 0 0 1px rgba(0,0,0,.6), 0 0 14px ${tone === 'amber' ? 'rgba(245,196,81,.25)' : 'rgba(54,224,122,.2)'}` }}>
+      <span className="absolute inset-0 origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-150" style={{ background: c }} />
+      <span className="relative group-hover:text-black">{children}</span>
+    </button>
+  );
+};
+
+/** 标题栏计时：自己刷新，不牵动整个终端 */
+const Clock: React.FC = () => {
+  const [ms, setMs] = useState(0);
+  useEffect(() => { const t0 = performance.now(); const id = setInterval(() => setMs(performance.now() - t0), 100); return () => clearInterval(id); }, []);
+  return <span className="tabular-nums opacity-70">{`${String(Math.floor(ms / 60000)).padStart(2, '0')}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}.${Math.floor((ms % 1000) / 100)}`}</span>;
+};
+
+const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess, collectedPages = [], direct }) => {
   // 动态文件表：随身草稿页放在最上面，方便解谜
   const files = React.useMemo(() => ([
     { name: 'draft_pages.dat', size: '0.4 KB', content: buildDraftPagesFile(collectedPages) },
@@ -285,14 +313,13 @@ const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess, collect
   const [currentLine, setCurrentLine] = useState('');
   const [done, setDone] = useState(false);
   const [crtOff, setCrtOff] = useState(false);
-  const [phase, setPhase] = useState<Phase>('terminal');
+  const [phase, setPhase] = useState<Phase>(direct ? 'files' : 'terminal');
   const [hackProgress, setHackProgress] = useState(0);
-  const [viewingFile, setViewingFile] = useState<number | null>(null);
-  const [pwInput, setPwInput] = useState('');
-  const [pwError, setPwError] = useState(false);
-  const [deniedFlash, setDeniedFlash] = useState(false);
   const skipRef = useRef(false); // 保留：演出不再允许点击快进
-  const hackedRef = useRef(false);
+  const hackedRef = useRef(!!direct);
+  const [diving, setDiving] = useState(false);   // 入侵成功后「钻进屏幕」
+  // 第一次进来：先看一页 3D 分镜（电视头小豆穿过世界线）
+  const [prologue, setPrologue] = useState(() => !direct && !hasSeen('page:arc_open'));
 
   // ============ WebAudio：环境电流 / 打字声 / 关机音 ============
   const audioRef = useRef<{ ctx: AudioContext; master: GainNode } | null>(null);
@@ -354,7 +381,8 @@ const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess, collect
     };
   }, [ensureAudio, blip]);
 
-  // ---- 背景字符雨 ----
+  // ---- 背景字符雨：远近两层，最后收成一条线「开机」 ----
+  const [booted, setBooted] = useState(false);
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -363,34 +391,38 @@ const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess, collect
     resize();
     window.addEventListener('resize', resize);
     const CHARS = 'アイウエオカキクケコサシスセソタチツテトナニヌネノ0123456789ABCDEFXZ<>+*';
-    const fontSize = 16;
-    let cols = Math.floor(canvas.width / fontSize);
-    let drops = Array.from({ length: cols }, () => Math.floor(Math.random() * -40));
+    const layers = [
+      { size: 11, speed: 0.6, alpha: 0.35, drops: [] as number[] },
+      { size: 17, speed: 1, alpha: 0.85, drops: [] as number[] },
+    ];
+    const reset = () => layers.forEach(l => { l.drops = Array.from({ length: Math.ceil(canvas.width / l.size) }, () => Math.random() * -50); });
+    reset();
     const start = performance.now();
     let raf = 0;
+    let bootFired = false;
     const loop = (now: number) => {
       const elapsed = now - start;
       const fade = elapsed < RAIN_FULL_MS ? 1 : Math.max(0, 1 - (elapsed - RAIN_FULL_MS) / RAIN_FADE_MS);
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
+      ctx.fillStyle = 'rgba(2, 6, 4, 0.12)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       if (fade > 0) {
-        ctx.font = `${fontSize}px monospace`;
-        if (Math.floor(canvas.width / fontSize) !== cols) {
-          cols = Math.floor(canvas.width / fontSize);
-          drops = Array.from({ length: cols }, () => Math.floor(Math.random() * -40));
-        }
-        for (let i = 0; i < cols; i++) {
-          const ch = CHARS[Math.floor(Math.random() * CHARS.length)];
-          const bright = Math.random() < 0.06;
-          ctx.fillStyle = bright ? `rgba(190,255,200,${0.95 * fade})` : `rgba(32,194,94,${(0.5 + Math.random() * 0.4) * fade})`;
-          ctx.fillText(ch, i * fontSize, drops[i] * fontSize);
-          if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
-          drops[i]++;
+        for (const l of layers) {
+          if (Math.ceil(canvas.width / l.size) !== l.drops.length) reset();
+          ctx.font = `${l.size}px ui-monospace, monospace`;
+          for (let i = 0; i < l.drops.length; i++) {
+            const ch = CHARS[Math.floor(Math.random() * CHARS.length)];
+            const bright = Math.random() < 0.05;
+            ctx.fillStyle = bright ? `rgba(210,255,220,${fade})` : `rgba(32,194,94,${(0.4 + Math.random() * 0.5) * l.alpha * fade})`;
+            ctx.fillText(ch, i * l.size, l.drops[i] * l.size);
+            if (l.drops[i] * l.size > canvas.height && Math.random() > 0.975) l.drops[i] = 0;
+            l.drops[i] += l.speed;
+          }
         }
         raf = requestAnimationFrame(loop);
       } else {
-        ctx.fillStyle = '#000';
+        ctx.fillStyle = '#020604';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+        if (!bootFired) { bootFired = true; setBooted(true); }
       }
     };
     raf = requestAnimationFrame(loop);
@@ -399,6 +431,7 @@ const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess, collect
 
   // ---- 逐字打印（带打字音；点击快进） ----
   useEffect(() => {
+    if (direct) return;
     let alive = true;
     const timers: ReturnType<typeof setTimeout>[] = [];
     const allLines = hackAccess ? [...TERMINAL_LINES, '', HACK_LINE] : TERMINAL_LINES;
@@ -446,47 +479,78 @@ const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess, collect
         // ACCESS GRANTED 和弦
         setTimeout(() => { blip(523, 0.16, 'square', 0.09); blip(784, 0.22, 'square', 0.07); }, 120);
         hackedRef.current = true;
-        setTimeout(() => setPhase('files'), 600);
+        addFlag('hack');
+        setTimeout(() => { setDiving(true); blip(200, 0.9, 'sawtooth', 0.08, 1800); }, 700);
+        setTimeout(() => { setPhase('files'); setDiving(false); }, 1700);
       }
     };
     blip(180, 0.25, 'sawtooth', 0.1, 90);
     setTimeout(tick, 350);
   };
 
-  const openFile = (i: number) => {
-    const f = files[i];
-    if (f.content === 'ENCRYPTED') {
-      blip(700, 0.08, 'square', 0.06);
-      setPwInput('');
-      setPwError(false);
-      setPhase('password');
-      return;
-    }
-    if (f.content === null) {
-      // 权限不足
-      blip(160, 0.25, 'sawtooth', 0.12, 70);
-      setDeniedFlash(true);
-      setTimeout(() => setDeniedFlash(false), 900);
-      return;
-    }
-    blip(900, 0.06, 'square', 0.06);
-    setViewingFile(i);
-    setPhase('viewing');
-  };
+  // ---- 隐藏系统：交给 3D 档案馆 ----
+  const checkPassword = useCallback((pw: string) => {
+    if (pw === SEALED_PASSWORD) { addFlag('read:sealed'); return true; }
+    return false;
+  }, []);
+  const onRead = useCallback((name: string) => addFlag(`read:${name}`), []);
 
   // ---- CRT 关机（含关机音） ----
   const handleExitWorld = () => {
-    // 电源切断音：高→低俯冲 + 咔哒
     blip(900, 0.5, 'sawtooth', 0.16, 40);
     setTimeout(() => blip(60, 0.12, 'square', 0.2, 25), 380);
     setCrtOff(true);
     setTimeout(() => onExit(hackedRef.current), 1250);
   };
 
-  const green = '#20c25e';
+  // 屏幕在字符雨收拢时「开机」
+  const [screenOn, setScreenOn] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setScreenOn(true), RAIN_FULL_MS + 150); return () => clearTimeout(t); }, []);
+  // 入侵时旁边滚动的十六进制
+  const [hex, setHex] = useState<string[]>([]);
+  useEffect(() => {
+    if (phase !== 'hacking') return;
+    const id = setInterval(() => {
+      const row = Array.from({ length: 8 }, () => Math.floor(Math.random() * 65536).toString(16).padStart(4, '0')).join(' ');
+      setHex(h => [...h.slice(-9), `0x${Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0')}  ${row}`]);
+    }, 60);
+    return () => clearInterval(id);
+  }, [phase]);
+
+  const G = '#36e07a';
+  const DIM = 'rgba(54,224,122,.55)';
+  const AMBER = '#f5c451';
+  const RED = '#ff5d6c';
+  const CYAN = '#6ee7f2';
+
+  /** 按语义给终端行上色（文字本身不变） */
+  const renderLine = (line: string, key: React.Key) => {
+    let color = G;
+    if (line.startsWith('> [SYSTEM]')) color = CYAN;
+    else if (line.startsWith('> [!]')) color = AMBER;
+    if (line.includes('▓')) {
+      const m = line.match(/^(.*?)(▓+)(░+)(.*)$/);
+      if (m) return (
+        <div key={key} className="whitespace-pre-wrap min-h-[1.5em]" style={{ color }}>
+          {m[1]}<span className="mx-0.5 inline-block" style={{ color: G, textShadow: `0 0 10px ${G}` }}>{m[2]}</span><span style={{ color: DIM }}>{m[3]}</span>{m[4]}
+        </div>
+      );
+    }
+    const parts = line.split(/(lost|丢失|无$|CLEAR)/);
+    return (
+      <div key={key} className="whitespace-pre-wrap min-h-[1.5em]" style={{ color }}>
+        {parts.map((p, i) => p === 'lost' || p === '丢失' || p === '无'
+          ? <span key={i} style={{ color: RED, textShadow: `0 0 8px ${RED}` }}>{p}</span>
+          : p === 'CLEAR' ? <span key={i} className="font-bold" style={{ color: '#d6ffe4', textShadow: `0 0 12px ${G}` }}>{p}</span>
+            : <React.Fragment key={i}>{p}</React.Fragment>)}
+      </div>
+    );
+  };
+
+  const path = phase === 'files' ? '/SYSTEM_HIDDEN' : '/WORLD_02';
 
   return (
-    <div className="fixed inset-0 bg-black overflow-hidden select-none">
+    <div className="fixed inset-0 overflow-hidden select-none" style={{ background: '#020604' }}>
       <style>{`
         @keyframes crt-shutdown {
           0%   { transform: scaleY(1) scaleX(1); filter: brightness(1); }
@@ -495,232 +559,119 @@ const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess, collect
           80%  { transform: scaleY(0.004) scaleX(0.1); filter: brightness(8); }
           100% { transform: scaleY(0.003) scaleX(0.001); filter: brightness(10); }
         }
-        @keyframes crt-flash {
-          0% { opacity: 0; } 12% { opacity: 0.95; } 40% { opacity: 0.2; } 100% { opacity: 0; }
-        }
-        @keyframes crt-line-glow {
-          0% { opacity: 0; } 30% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; transform: scaleX(0.001); }
-        }
+        @keyframes crt-flash { 0% { opacity: 0; } 12% { opacity: 0.95; } 40% { opacity: 0.2; } 100% { opacity: 0; } }
+        @keyframes crt-line-glow { 0% { opacity: 0; } 30% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; transform: scaleX(0.001); } }
         @keyframes crt-dot-fade { 0% { opacity: 1; } 100% { opacity: 0; } }
+        @keyframes crt-on { 0% { transform: scale(1, 0.004); filter: brightness(6); opacity: .9; } 35% { transform: scale(1, 0.004); filter: brightness(6); } 70% { transform: scale(1, 1.02); filter: brightness(1.8); } 100% { transform: scale(1, 1); filter: brightness(1); opacity: 1; } }
+        @keyframes crt-flicker { 0%, 100% { opacity: 1; } 47% { opacity: .985; } 50% { opacity: .94; } 53% { opacity: .99; } }
+        @keyframes scan-roll { from { transform: translateY(-30%); } to { transform: translateY(130%); } }
         @keyframes cursor-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
         @keyframes denied-shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+        @keyframes granted { 0% { clip-path: inset(0 100% 0 0); } 60% { clip-path: inset(0 0 0 0); } 70% { transform: translateX(-3px); } 75% { transform: translateX(3px); } 80% { transform: none; } 100% { clip-path: inset(0 0 0 0); } }
+        @keyframes line-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+        .term-scroll::-webkit-scrollbar { width: 6px; } .term-scroll::-webkit-scrollbar-thumb { background: rgba(54,224,122,.35); }
       `}</style>
 
       <div className="absolute inset-0"
-           style={crtOff ? { animation: 'crt-shutdown 0.9s cubic-bezier(0.55, 0, 0.9, 0.35) forwards', transformOrigin: 'center center', background: '#0a0f0a' } : undefined}>
+           style={crtOff ? { animation: 'crt-shutdown 0.9s cubic-bezier(0.55, 0, 0.9, 0.35) forwards', transformOrigin: 'center center' } : undefined}>
+        {/* 字符雨（在玻璃后面） */}
         <canvas ref={canvasRef} className="absolute inset-0" />
 
-        {/* ============ 终端主界面 ============ */}
-        {(phase === 'terminal' || phase === 'hacking') && (
-          <div className="absolute inset-0 overflow-y-auto">
-            <div className="w-full max-w-2xl mx-auto px-6 pt-12 pb-24 font-mono text-[13px] md:text-base leading-relaxed" style={{ color: green, textShadow: '0 0 8px rgba(32,194,94,0.55)' }}>
-              {typed.map((line, i) => (
-                <div key={i} className="whitespace-pre-wrap min-h-[1.4em]">{line}</div>
-              ))}
-              {!done && (
-                <div className="whitespace-pre-wrap min-h-[1.4em]">
-                  {currentLine}<span style={{ animation: 'cursor-blink 1s step-end infinite' }}>█</span>
-                </div>
-              )}
+        {/* 显示器 */}
+        {phase === 'files' && prologue && (
+          <MangaCutscene page={PAGES.arc_open} onEnd={() => { markSeen('page:arc_open'); setPrologue(false); }} />
+        )}
+        {phase === 'files' && !prologue && (
+          <Archive3D files={files} pageCipher={PAGE_CIPHER} collectedPages={collectedPages} sealedContent={SEALED_CONTENT}
+            checkPassword={checkPassword} onRead={onRead} onExit={handleExitWorld} blip={blip} />
+        )}
+        {phase === 'files' && <div className="absolute inset-0 bg-white pointer-events-none" style={{ animation: 'crt-flash 1.2s ease-out forwards' }} />}
+        {screenOn && phase !== 'files' && (
+          <div className="absolute inset-0 flex items-center justify-center p-2 md:p-6"
+               style={diving ? { transform: 'scale(5)', filter: 'brightness(4)', opacity: 0, transition: 'transform 1s cubic-bezier(.6,0,.9,.4), filter 1s, opacity .9s .1s' } : undefined}>
+            <div className="relative w-full h-full max-w-5xl overflow-hidden"
+                 style={{
+                   borderRadius: 'clamp(12px, 3vw, 34px)',
+                   background: 'radial-gradient(ellipse at 50% 45%, rgba(8,28,16,.92) 0%, rgba(3,12,7,.96) 65%, rgba(1,4,2,.98) 100%)',
+                   boxShadow: 'inset 0 0 80px rgba(0,0,0,.9), inset 0 0 0 2px rgba(54,224,122,.12), 0 0 60px rgba(54,224,122,.08)',
+                   animation: 'crt-on .75s cubic-bezier(.2,.8,.3,1) both, crt-flicker 4s linear infinite .8s',
+                   fontFamily: '"JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, "Noto Sans SC", monospace',
+                 }}>
+              {/* 标题栏 */}
+              <div className="flex items-center gap-3 px-4 md:px-6 py-2.5 text-[11px] md:text-xs border-b" style={{ borderColor: 'rgba(54,224,122,.18)', color: DIM }}>
+                <span className="flex gap-1.5"><i className="w-2.5 h-2.5 rounded-full" style={{ background: RED, opacity: .7 }} /><i className="w-2.5 h-2.5 rounded-full" style={{ background: AMBER, opacity: .7 }} /><i className="w-2.5 h-2.5 rounded-full" style={{ background: G, opacity: .7 }} /></span>
+                <span style={{ color: G }}>shadowlee://console</span><span>{path}</span>
+                <span className="ml-auto flex items-center gap-2">
+                  {phase === 'files'
+                    ? <><i className="w-1.5 h-1.5 rounded-full" style={{ background: AMBER, boxShadow: `0 0 6px ${AMBER}` }} />TVHEAD_ADMIN</>
+                    : <><i className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: RED, boxShadow: `0 0 6px ${RED}` }} />LINK LOST</>}
+                  <Clock />
+                </span>
+              </div>
 
-              {done && phase === 'terminal' && (
-                <div className="mt-6 flex flex-wrap items-center gap-3">
-                  <span style={{ animation: 'cursor-blink 1s step-end infinite' }}>█</span>
-                  {hackAccess && (
-                    <button onClick={(ev) => { ev.stopPropagation(); startHack(); }}
-                      className="border px-6 py-2 tracking-[0.3em] font-bold transition-colors border-yellow-400 text-yellow-300 hover:bg-yellow-400 hover:text-black"
-                      style={{ textShadow: 'none' }}>
-                      [ 入侵终端 ]
-                    </button>
-                  )}
-                  <button onClick={(ev) => { ev.stopPropagation(); handleExitWorld(); }}
-                    className="border px-6 py-2 tracking-[0.3em] font-bold transition-colors hover:text-black"
-                    style={{ borderColor: green, color: green, textShadow: 'none' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = green)}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                    [ 退出世界 ]
-                  </button>
-                </div>
-              )}
+              {/* ============ 终端主界面 ============ */}
+              {(phase === 'terminal' || phase === 'hacking') && (
+                <div className="absolute inset-x-0 top-10 bottom-0 overflow-y-auto term-scroll">
+                  <div className="max-w-3xl px-5 md:px-10 pt-6 pb-24 text-[13px] md:text-[15px] leading-relaxed" style={{ textShadow: '0 0 8px rgba(54,224,122,.5)' }}>
+                    {typed.map((line, i) => renderLine(line, i))}
+                    {!done && (
+                      <div className="whitespace-pre-wrap min-h-[1.5em]" style={{ color: G }}>
+                        {currentLine}<span style={{ animation: 'cursor-blink 1s step-end infinite' }}>█</span>
+                      </div>
+                    )}
 
-              {phase === 'hacking' && (
-                <div className="mt-6">
-                  <div>{'> 正在提升权限 ... TVHEAD_ADMIN'}</div>
-                  <div className="flex items-center gap-3 mt-2">
-                    <div className="flex-1 h-4 border" style={{ borderColor: green }}>
-                      <div className="h-full transition-none" style={{ width: `${hackProgress}%`, background: green, boxShadow: `0 0 10px ${green}` }} />
-                    </div>
-                    <span className="w-12 text-right">{hackProgress}%</span>
+                    {done && phase === 'terminal' && (
+                      <div className="mt-8 flex flex-wrap items-center gap-4">
+                        <span style={{ color: G, animation: 'cursor-blink 1s step-end infinite' }}>█</span>
+                        {hackAccess && <Key blip={blip} tone="amber" onClick={startHack}>[ 入侵终端 ]</Key>}
+                        <Key blip={blip} onClick={handleExitWorld}>[ 退出世界 ]</Key>
+                      </div>
+                    )}
+
+                    {phase === 'hacking' && (
+                      <div className="mt-6 grid md:grid-cols-[1fr_auto] gap-4">
+                        <div>
+                          <div style={{ color: G }}>{'> 正在提升权限 ... TVHEAD_ADMIN'}</div>
+                          <div className="flex items-center gap-3 mt-3">
+                            <div className="flex-1 h-4 border relative overflow-hidden" style={{ borderColor: G }}>
+                              <div className="h-full" style={{ width: `${hackProgress}%`, background: `repeating-linear-gradient(90deg, ${G} 0 6px, rgba(54,224,122,.6) 6px 8px)`, boxShadow: `0 0 12px ${G}` }} />
+                            </div>
+                            <span className="w-12 text-right tabular-nums" style={{ color: G }}>{hackProgress}%</span>
+                          </div>
+                          {hackProgress >= 100 && (
+                            <div className="mt-4 inline-block px-3 py-1 font-bold tracking-[0.3em]"
+                                 style={{ color: '#000', background: AMBER, boxShadow: `0 0 20px ${AMBER}`, animation: 'granted .6s steps(12) both' }}>
+                              {'> ACCESS GRANTED'}
+                            </div>
+                          )}
+                        </div>
+                        <div className="hidden md:block text-[10px] leading-snug tabular-nums" style={{ color: 'rgba(54,224,122,.4)', textShadow: 'none' }}>
+                          {hex.map((h, i) => <div key={i}>{h}</div>)}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  {hackProgress >= 100 && (
-                    <div className="mt-3 font-bold text-yellow-300" style={{ textShadow: '0 0 10px rgba(250,204,21,0.6)' }}>
-                      {'> ACCESS GRANTED'}
-                    </div>
-                  )}
                 </div>
               )}
+
+              {/* 玻璃：扫描线 + 滚动亮带 + 暗角 */}
+              <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(0deg, rgba(0,0,0,.28) 0px, rgba(0,0,0,.28) 1px, transparent 1px, transparent 3px)' }} />
+              <div className="absolute inset-x-0 h-1/4 pointer-events-none" style={{ background: 'linear-gradient(transparent, rgba(120,255,170,.035), transparent)', animation: 'scan-roll 7s linear infinite' }} />
+              <div className="absolute inset-0 pointer-events-none" style={{ borderRadius: 'inherit', boxShadow: 'inset 0 0 120px rgba(0,0,0,.75)' }} />
             </div>
           </div>
         )}
-
-        {/* ============ 隐藏系统：文件列表 ============ */}
-        {phase === 'files' && (
-          <div className="absolute inset-0 overflow-y-auto">
-            <div className="w-full max-w-2xl mx-auto px-6 pt-12 pb-24 font-mono text-[13px] md:text-base leading-relaxed"
-                 style={{ color: green, textShadow: '0 0 8px rgba(32,194,94,0.4)', animation: deniedFlash ? 'denied-shake 0.25s' : undefined }}>
-              <div className="text-yellow-300 mb-1">{'root@shadowlee:/SYSTEM_HIDDEN$  ls -la'}</div>
-              <div className="opacity-60 mb-3">{'权限等级：TVHEAD_ADMIN ｜ 该目录不属于任何一个世界'}</div>
-              {files.map((f, i) => (
-                <button key={f.name} onClick={() => openFile(i)}
-                  className="w-full text-left px-2 py-1.5 border border-transparent hover:border-[#20c25e] hover:bg-[#20c25e]/10 flex justify-between transition-colors">
-                  <span>{f.content === null ? '🔒 ' : f.content === 'ENCRYPTED' ? '🔐 ' : '📄 '}{f.name}</span>
-                  <span className="opacity-50">{f.size}</span>
-                </button>
-              ))}
-              {deniedFlash && (
-                <div className="mt-2 text-red-400 font-bold">{'> ACCESS DENIED —— 该文件属于下一个世界'}</div>
-              )}
-              <div className="mt-6 flex gap-3">
-                <button onClick={handleExitWorld}
-                  className="border px-6 py-2 tracking-[0.3em] font-bold hover:text-black transition-colors"
-                  style={{ borderColor: green, color: green, textShadow: 'none' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = green)}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                  [ 退出世界 ]
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ============ 隐藏系统：密码解锁 ============ */}
-        {phase === 'password' && (
-          <div className="absolute inset-0 overflow-y-auto">
-            <div className="w-full max-w-2xl mx-auto px-6 pt-12 pb-24 font-mono text-[13px] md:text-base leading-relaxed" style={{ color: green }}>
-              <div className="text-yellow-300 mb-3">{'root@shadowlee:/SYSTEM_HIDDEN$  decrypt sealed_truth.enc'}</div>
-              <div>{'> 该文件由三席加密。'}</div>
-              <div className="opacity-70">{'> 提示：密钥散落在五张草稿页的边角。第五页写着解法。'}</div>
-              <div className="mt-3 border-l-2 pl-3 text-xs md:text-sm opacity-80 space-y-0.5" style={{ borderColor: green }}>
-                <div className="text-yellow-300/80">{'── 随身草稿页扫描 ──'}</div>
-                {PAGE_CIPHER.map(([id, label, cipher]) => (
-                  <div key={id}>{collectedPages.includes(id) ? `${label} …… ${cipher}` : `${label} …… [未持有]`}</div>
-                ))}
-              </div>
-              <div className="mt-4 flex items-center gap-2">
-                <span>{'密钥 >'}</span>
-                <input
-                  autoFocus
-                  value={pwInput}
-                  onChange={ev => { setPwInput(ev.target.value.replace(/[^0-9]/g, '').slice(0, 8)); setPwError(false); }}
-                  onKeyDown={ev => {
-                    if (ev.key === 'Enter') {
-                      if (pwInput === SEALED_PASSWORD) {
-                        blip(523, 0.16, 'square', 0.1); blip(784, 0.24, 'square', 0.08);
-                        setPhase('sealed');
-                      } else {
-                        blip(150, 0.3, 'sawtooth', 0.14, 60);
-                        setPwError(true);
-                      }
-                    }
-                  }}
-                  className="bg-transparent border-b-2 outline-none font-mono tracking-[0.5em] w-48 text-lg"
-                  style={{ borderColor: green, color: green, caretColor: green }}
-                  placeholder="········"
-                />
-                <span style={{ animation: 'cursor-blink 1s step-end infinite' }}>█</span>
-              </div>
-              {pwError && <div className="mt-3 text-red-400 font-bold">{'> DECRYPT FAILED —— 密钥校验不通过'}</div>}
-              <div className="mt-6 flex gap-3">
-                <button onClick={() => { blip(600, 0.05, 'square', 0.05); setPhase('files'); }}
-                  className="border px-6 py-2 tracking-[0.2em] font-bold hover:text-black transition-colors"
-                  style={{ borderColor: green, color: green }}
-                  onMouseEnter={e => (e.currentTarget.style.background = green)}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                  [ 返回 ]
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ============ 隐藏系统：解密后的真相 ============ */}
-        {phase === 'sealed' && (
-          <div className="absolute inset-0 overflow-y-auto">
-            <div className="w-full max-w-2xl mx-auto px-6 pt-12 pb-24 font-mono text-[12px] md:text-sm leading-relaxed py-8" style={{ color: green }}>
-              <div className="text-yellow-300 mb-1">{'> DECRYPT OK —— sealed_truth.enc'}</div>
-              <div className="text-yellow-300/60 mb-3 text-xs">{'密钥指纹：22966160 ｜ 加密方：三席'}</div>
-              <pre className="whitespace-pre-wrap border-l-2 pl-4 opacity-90" style={{ borderColor: '#eab308' }}>
-                {SEALED_CONTENT}
-              </pre>
-              <div className="mt-6 flex gap-3">
-                <button onClick={() => { blip(600, 0.05, 'square', 0.05); setPhase('files'); }}
-                  className="border px-6 py-2 tracking-[0.2em] font-bold hover:text-black transition-colors"
-                  style={{ borderColor: green, color: green }}
-                  onMouseEnter={e => (e.currentTarget.style.background = green)}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                  [ 返回 ]
-                </button>
-                <button onClick={handleExitWorld}
-                  className="border px-6 py-2 tracking-[0.2em] font-bold hover:text-black transition-colors"
-                  style={{ borderColor: green, color: green }}
-                  onMouseEnter={e => (e.currentTarget.style.background = green)}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                  [ 退出世界 ]
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ============ 隐藏系统：查看文件 ============ */}
-        {phase === 'viewing' && viewingFile !== null && (
-          <div className="absolute inset-0 overflow-y-auto">
-            <div className="w-full max-w-2xl mx-auto px-6 pt-12 pb-24 font-mono text-[12px] md:text-sm leading-relaxed" style={{ color: green }}>
-              <div className="text-yellow-300 mb-3">{`root@shadowlee:/SYSTEM_HIDDEN$  cat ${files[viewingFile].name}`}</div>
-              <pre className="whitespace-pre-wrap border-l-2 pl-4 opacity-90" style={{ borderColor: green }}>
-                {files[viewingFile].content}
-              </pre>
-              <div className="mt-6 flex gap-3">
-                <button onClick={() => { blip(600, 0.05, 'square', 0.05); setPhase('files'); setViewingFile(null); }}
-                  className="border px-6 py-2 tracking-[0.2em] font-bold hover:text-black transition-colors"
-                  style={{ borderColor: green, color: green }}
-                  onMouseEnter={e => (e.currentTarget.style.background = green)}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                  [ 返回 ]
-                </button>
-                <button onClick={handleExitWorld}
-                  className="border px-6 py-2 tracking-[0.2em] font-bold hover:text-black transition-colors"
-                  style={{ borderColor: green, color: green }}
-                  onMouseEnter={e => (e.currentTarget.style.background = green)}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                  [ 退出世界 ]
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="absolute inset-0 pointer-events-none opacity-25"
-             style={{ background: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.35) 0px, rgba(0,0,0,0.35) 1px, transparent 1px, transparent 3px)' }} />
       </div>
 
-      {/* CRT 关机：全屏白光爆闪 */}
-      {crtOff && (
-        <div className="absolute inset-0 bg-white pointer-events-none"
-             style={{ animation: 'crt-flash 0.9s ease-out forwards' }} />
-      )}
-      {/* CRT 关机：中央高亮扫描线 */}
+      {crtOff && <div className="absolute inset-0 bg-white pointer-events-none" style={{ animation: 'crt-flash 0.9s ease-out forwards' }} />}
       {crtOff && (
         <div className="absolute inset-0 flex items-center pointer-events-none">
-          <div className="w-full h-[4px] bg-white"
-               style={{ animation: 'crt-line-glow 0.9s cubic-bezier(0.55,0,0.9,0.35) forwards', boxShadow: '0 0 24px 8px rgba(255,255,255,0.95), 0 0 60px 20px rgba(180,255,200,0.5)' }} />
+          <div className="w-full h-[4px] bg-white" style={{ animation: 'crt-line-glow 0.9s cubic-bezier(0.55,0,0.9,0.35) forwards', boxShadow: '0 0 24px 8px rgba(255,255,255,0.95), 0 0 60px 20px rgba(180,255,200,0.5)' }} />
         </div>
       )}
-      {/* CRT 关机：残留光点 */}
       {crtOff && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="w-2 h-2 rounded-full bg-white"
-               style={{ animation: 'crt-dot-fade 0.4s ease-out 0.85s forwards', boxShadow: '0 0 22px 8px rgba(255,255,255,0.9)' }} />
+          <div className="w-2 h-2 rounded-full bg-white" style={{ animation: 'crt-dot-fade 0.4s ease-out 0.85s forwards', boxShadow: '0 0 22px 8px rgba(255,255,255,0.9)' }} />
         </div>
       )}
     </div>
