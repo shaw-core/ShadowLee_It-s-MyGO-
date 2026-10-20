@@ -34,6 +34,11 @@ export const cheatUnlockAll = () => updateSave(d => {
   d.inventory = Array.from(inv);
   LEVELS2D.forEach(lv => { const k = statKey(1, lv.id); d.stats[k] = d.stats[k] ?? { clears: 1, got: [] }; d.stats[k].clears ||= 1; });
   LEVELS3D.forEach(lv => { const k = statKey(2, lv.id); d.stats[k] = d.stats[k] ?? { clears: 1, got: [] }; d.stats[k].clears ||= 1; });
-  // 测试用：悠亚直接解锁（关卡里按 Y 或点「悠亚」按钮切换，不用对麦克风喊）
-  if (!d.flags.includes('yua')) d.flags.push('yua');
+  // 测试用：靠「做过某件事」解锁的内容也一起打开
+  //   yua    悠亚（关卡里按 Y 或点「悠亚」按钮切换，不用对麦克风喊）
+  //   pat    手账 · 摸头记录
+  //   shadow 手账 · 魔法熊猫
+  //   hack   手账 · 未授权附录（可从附录直接接入「世界尽头」）
+  // 「回忆」靠「看过」记录显示，这里不动：标成已看会让关卡里的小剧场和关间漫画不再播放
+  for (const f of ['yua', 'pat', 'shadow', 'hack']) if (!d.flags.includes(f)) d.flags.push(f);
 });

@@ -88,7 +88,7 @@ export const CODEX: CodexEntry[] = [
   },
   {
     id: 'p_pat', cat: 'people', title: '摸头记录', unlock: 'pat', tag: '小秘密',
-    body: `走到熊猫旁边按 E，可以摸摸它的头。
+    body: `走到熊猫旁边按 F，可以摸摸它的头。
 
 它会眯起眼睛，冒出小小的爱心。
 小室说"别摸太久，它会害羞"。
