@@ -4,6 +4,8 @@ import { addFlag, hasSeen, markSeen } from '../core/save';
 import MangaCutscene from './MangaCutscene';
 import { PAGES } from '../story/cutscenes';
 import Archive3D from './Archive3D';
+import ForeshadowFeed, { FeedStage } from './ForeshadowFeed';
+import { getSave } from '../core/save';
 
 interface MatrixEndingProps {
   onExit: (hacked: boolean) => void;
@@ -46,9 +48,19 @@ const TERMINAL_LINES = [
   '> 远处，一个陌生的天空正在上色。',
   '> 而在她们看不见的角落——',
   '> 一只新的熊猫存档点，慢慢亮了起来。',
+  '> 轮廓比对 .......... 不一致',
+  '> [下一帧记录丢失]',
   '',
   '> [SYSTEM] press EXIT to leave this world',
 ];
+
+// 第二章首通 · 伏笔演出：这三行出现时，角落里的监控画面跟着变
+const FX_PANDA = '> 一只新的熊猫存档点，慢慢亮了起来。';
+const FX_MISMATCH = '> 轮廓比对 .......... 不一致';
+const FX_LOST = '> [下一帧记录丢失]';
+const FX_SEEN = 'fx:c2_contour';
+/** 演出期间，这几行打完后多停一会儿（只在播放演出时） */
+const FX_HOLD: Record<string, number> = { [FX_PANDA]: 900, [FX_MISMATCH]: 800, [FX_LOST]: 650 };
 
 const HACK_LINE = '> [!] 检测到未知权限碎片：TVHEAD_ADMIN —— 是否尝试入侵终端系统？';
 
@@ -320,6 +332,9 @@ const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess, collect
   const [diving, setDiving] = useState(false);   // 入侵成功后「钻进屏幕」
   // 第一次进来：先看一页 3D 分镜（电视头小豆穿过世界线）
   const [prologue, setPrologue] = useState(() => !direct && !hasSeen('page:arc_open'));
+  // 首通伏笔：只在第一次通关看到这块终端时播放（开发页 ?fx 可强制重放）
+  const fxOn = useRef(!direct && (!hasSeen(FX_SEEN) || (import.meta.env.DEV && new URLSearchParams(location.search).has('fx'))));
+  const [feed, setFeed] = useState<FeedStage | null>(null);
 
   // ============ WebAudio：环境电流 / 打字声 / 关机音 ============
   const audioRef = useRef<{ ctx: AudioContext; master: GainNode } | null>(null);
@@ -439,6 +454,11 @@ const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess, collect
       for (const line of allLines) {
         if (!alive) return;
         if (skipRef.current) break;
+        if (fxOn.current) {
+          if (line === FX_PANDA) setFeed('panda');
+          else if (line === FX_MISMATCH) setFeed('mismatch');
+          else if (line === FX_LOST) setFeed('tear');
+        }
         for (let ci = 1; ci <= line.length; ci++) {
           if (!alive) return;
           if (skipRef.current) break;
@@ -450,7 +470,13 @@ const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess, collect
         setCurrentLine('');
         typeSoundRef.current(420, 0.05, 'square', 0.04); // 回车音
         if (!skipRef.current) {
-          await new Promise<void>(res => { timers.push(setTimeout(res, line === '' ? 100 : LINE_PAUSE_MS)); });
+          const hold = fxOn.current ? FX_HOLD[line] ?? 0 : 0;
+          await new Promise<void>(res => { timers.push(setTimeout(res, (line === '' ? 100 : LINE_PAUSE_MS) + hold)); });
+        }
+        if (fxOn.current && line === FX_LOST && alive) {
+          setFeed('off');
+          markSeen(FX_SEEN);
+          timers.push(setTimeout(() => { if (alive) setFeed(null); }, 900));
         }
       }
       if (alive) {
@@ -536,10 +562,10 @@ const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess, collect
         </div>
       );
     }
-    const parts = line.split(/(lost|丢失|无$|CLEAR)/);
+    const parts = line.split(/(lost|丢失|无$|CLEAR|不一致)/);
     return (
       <div key={key} className="whitespace-pre-wrap min-h-[1.5em]" style={{ color }}>
-        {parts.map((p, i) => p === 'lost' || p === '丢失' || p === '无'
+        {parts.map((p, i) => p === 'lost' || p === '丢失' || p === '无' || p === '不一致'
           ? <span key={i} style={{ color: RED, textShadow: `0 0 8px ${RED}` }}>{p}</span>
           : p === 'CLEAR' ? <span key={i} className="font-bold" style={{ color: '#d6ffe4', textShadow: `0 0 12px ${G}` }}>{p}</span>
             : <React.Fragment key={i}>{p}</React.Fragment>)}
@@ -613,6 +639,11 @@ const MatrixEnding: React.FC<MatrixEndingProps> = ({ onExit, hackAccess, collect
               {(phase === 'terminal' || phase === 'hacking') && (
                 <div className="absolute inset-x-0 top-10 bottom-0 overflow-y-auto term-scroll">
                   <div className="max-w-3xl px-5 md:px-10 pt-6 pb-24 text-[13px] md:text-[15px] leading-relaxed" style={{ textShadow: '0 0 8px rgba(54,224,122,.5)' }}>
+                    {feed && (
+                      <div className="mb-4 w-full max-w-[320px] md:absolute md:right-6 md:top-6 md:w-[300px] md:mb-0">
+                        <ForeshadowFeed stage={feed} reduce={getSave().settings.reduceMotion} />
+                      </div>
+                    )}
                     {typed.map((line, i) => renderLine(line, i))}
                     {!done && (
                       <div className="whitespace-pre-wrap min-h-[1.5em]" style={{ color: G }}>

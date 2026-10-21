@@ -36,6 +36,27 @@ const portraitUrl = (who: Who, face: Face, ink: boolean) => {
 
 const INK_MOODS: Mood[] = ['manga', 'wire'];
 
+/** 客厅墙上的钟：七点整（第2话结尾，和街角的钟是两处异常） */
+const WallClock7: React.FC = () => (
+  <div className="absolute left-1/2 top-[9%] -translate-x-1/2 w-[clamp(96px,14vw,150px)] pointer-events-none anim-fade" aria-label="墙上的钟，指着七点整">
+    <svg viewBox="0 0 120 132" className="w-full h-auto drop-shadow-[3px_3px_0_rgba(30,58,138,.35)]">
+      <line x1="60" y1="0" x2="60" y2="10" stroke="#16182a" strokeWidth="3" />
+      <circle cx="60" cy="10" r="3" fill="#16182a" />
+      <circle cx="60" cy="72" r="56" fill="#fff7d6" stroke="#16182a" strokeWidth="6" />
+      <circle cx="60" cy="72" r="47" fill="#fffdf3" stroke="#16182a" strokeWidth="1.5" strokeDasharray="2 4" />
+      {Array.from({ length: 12 }, (_, i) => {
+        const a = (i / 12) * Math.PI * 2; const big = i % 3 === 0;
+        return <line key={i} x1={60 + Math.sin(a) * (big ? 36 : 40)} y1={72 - Math.cos(a) * (big ? 36 : 40)} x2={60 + Math.sin(a) * 45} y2={72 - Math.cos(a) * 45}
+                     stroke="#16182a" strokeWidth={big ? 4 : 2} strokeLinecap="round" />;
+      })}
+      {/* 时针指 7，分针指 12 */}
+      <line x1="60" y1="72" x2={60 + Math.sin((7 / 12) * Math.PI * 2) * 24} y2={72 - Math.cos((7 / 12) * Math.PI * 2) * 24} stroke="#16182a" strokeWidth="6" strokeLinecap="round" />
+      <line x1="60" y1="72" x2="60" y2="35" stroke="#16182a" strokeWidth="3.5" strokeLinecap="round" />
+      <circle cx="60" cy="72" r="5" fill="#f472b6" stroke="#16182a" strokeWidth="2" />
+    </svg>
+  </div>
+);
+
 const Backdrop: React.FC<{ mood: Mood; overlay?: boolean }> = ({ mood, overlay }) => {
   const base = 'absolute inset-0 transition-all duration-500';
   switch (mood) {
@@ -189,6 +210,7 @@ const DialogueSystem: React.FC<Props> = ({ scene, ngPlus, onEnd, overlay }) => {
   return (
     <div className="fixed inset-0 z-[80] select-none" onClick={() => !atChoices && !showLog && advance()}>
       <Backdrop mood={mood} overlay={overlay} />
+      {node?.prop === 'clock7' && <WallClock7 />}
 
       {/* 场景标题 */}
       <div className={`absolute top-4 left-4 text-xs font-bold px-2 py-1 ${dark ? 'text-white/70 border border-white/30' : 'text-ink/70 bg-white/70 border-2 border-ink/30'}`}>

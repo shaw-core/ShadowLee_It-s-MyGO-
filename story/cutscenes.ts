@@ -47,10 +47,10 @@ export const PAGES: Record<string, MangaPage> = {
     id: 'c1_open', pageNo: 'P.001', outro: 'fade',
     panels: [
       { at: [0, 0, 7, 3], art: 'city_night', caption: '某个和往常一样的晚上。' },
-      { at: [7, 0, 5, 5], art: 'dousha_desk', bubbles: [{ who: 'dousha', t: '大家晚上好～\n今天也一起玩吧！', x: 0.5, y: 0.2, tail: 'down' }] },
+      { at: [7, 0, 5, 5], art: 'dousha_desk', bubbles: [{ who: 'dousha', t: '大家晚上好——！\n今天也一起玩吧！', x: 0.5, y: 0.2, tail: 'down' }] },
       { at: [0, 3, 4, 5], art: 'danmaku_screen', sfx: [{ t: '刷——', x: 0.72, y: 0.86, rot: -8, size: 1 }] },
-      { at: [4, 3, 3, 5], art: 'novus_door', bubbles: [{ who: 'novus', t: '……又开播了。', x: 0.5, y: 0.16, tail: 'down' }] },
-      { at: [7, 5, 5, 3], art: 'glitch', ink: true, caption: '画面，好像闪了一下。', bubbles: [{ who: 'dousha', t: '……诶？', x: 0.78, y: 0.3, tail: 'left' }] },
+      { at: [4, 3, 3, 5], art: 'novus_door', bubbles: [{ who: 'novus', t: '又开播啦？', x: 0.5, y: 0.16, tail: 'down' }] },
+      { at: [7, 5, 5, 3], art: 'glitch', ink: true, caption: '画面，好像闪了一下。', bubbles: [{ who: 'dousha', t: '……诶？刚才闪了一下？', x: 0.78, y: 0.3, tail: 'left' }] },
     ],
   },
   c1_close: {
@@ -75,16 +75,16 @@ export const PAGES: Record<string, MangaPage> = {
     id: 'c2_mid1', pageNo: '2-1', outro: 'fade', style: '3d',
     panels: [
       { at: [0, 0, 7, 4], shot: 'm1_wide', caption: '岛，一座接着一座。' },
-      { at: [7, 0, 5, 4], shot: 'm1_dizzy', bubbles: [{ who: 'dousha', t: '头……有点晕。', x: 0.5, y: 0.16, tail: 'down' }], sfx: [{ t: '晃——', x: 0.2, y: 0.78, rot: -14, size: 1 }] },
-      { at: [0, 4, 5, 4], shot: 'm1_offer', bubbles: [{ who: 'novus', t: '张嘴。\n薄荷味的。', x: 0.32, y: 0.2, tail: 'down' }] },
+      { at: [7, 0, 5, 4], shot: 'm1_dizzy', bubbles: [{ who: 'dousha', t: '小室……我有点晕。', x: 0.5, y: 0.16, tail: 'down' }], sfx: [{ t: '晃——', x: 0.2, y: 0.78, rot: -14, size: 1 }] },
+      { at: [0, 4, 5, 4], shot: 'm1_offer', bubbles: [{ who: 'novus', t: '给你。\n薄荷糖。', x: 0.32, y: 0.2, tail: 'down' }] },
       { at: [5, 4, 7, 4], shot: 'm1_mint', caption: '凉凉的。脚下不晃了。', sfx: [{ t: '咔哒', x: 0.82, y: 0.3, rot: 10, size: 0.9 }] },
     ],
   },
   c2_mid2: {
     id: 'c2_mid2', pageNo: '2-2', outro: 'fade', style: '3d',
     panels: [
-      { at: [0, 0, 12, 4], shot: 'm2_street', bubbles: [{ who: 'dousha', t: '那是……\n我们住的那条街？', x: 0.24, y: 0.3, tail: 'down' }] },
-      { at: [0, 4, 6, 4], shot: 'm2_hold', bubbles: [{ who: 'novus', t: '别靠太近。', x: 0.7, y: 0.2, tail: 'down' }] },
+      { at: [0, 0, 12, 4], shot: 'm2_street', bubbles: [{ who: 'dousha', t: '等等，那不是\n我们住的那条街吗？', x: 0.24, y: 0.3, tail: 'down' }] },
+      { at: [0, 4, 6, 4], shot: 'm2_hold', bubbles: [{ who: 'novus', t: '先别过去。', x: 0.7, y: 0.2, tail: 'down' }] },
       { at: [6, 4, 6, 4], shot: 'm2_panda', caption: '熊猫一直看着她们的背影。' },
     ],
   },
@@ -92,8 +92,8 @@ export const PAGES: Record<string, MangaPage> = {
     id: 'c2_mid3', pageNo: '2-3', outro: 'fade', style: '3d',
     panels: [
       { at: [0, 0, 5, 8], shot: 'm3_wire', caption: '在线框里，只有她还是彩色的。' },
-      { at: [5, 0, 7, 4], shot: 'm3_hands', bubbles: [{ who: 'dousha', t: '……小室，\n你的手是暖的。', x: 0.3, y: 0.24, tail: 'right' }] },
-      { at: [5, 4, 7, 4], shot: 'm3_smile', bubbles: [{ who: 'novus', t: '你的也是。', x: 0.24, y: 0.22, tail: 'right' }] },
+      { at: [5, 0, 7, 4], shot: 'm3_hands', bubbles: [{ who: 'dousha', t: '小室，你的手\n还是暖的诶。', x: 0.3, y: 0.24, tail: 'right' }] },
+      { at: [5, 4, 7, 4], shot: 'm3_smile', bubbles: [{ who: 'novus', t: '你的也是呀。', x: 0.24, y: 0.22, tail: 'right' }] },
     ],
   },
   c2_mid4: {
@@ -101,7 +101,7 @@ export const PAGES: Record<string, MangaPage> = {
     panels: [
       { at: [0, 0, 12, 5], shot: 'm4_crack', caption: '天空的那道缝，越来越近了。' },
       { at: [0, 5, 6, 3], shot: 'm4_dousha', bubbles: [{ who: 'dousha', t: '如果那边\n什么都没有呢？', x: 0.72, y: 0.3, tail: 'left' }] },
-      { at: [6, 5, 6, 3], shot: 'm4_roomie', bubbles: [{ who: 'novus', t: '那就一起看看\n什么都没有的样子。', x: 0.3, y: 0.3, tail: 'right' }] },
+      { at: [6, 5, 6, 3], shot: 'm4_roomie', bubbles: [{ who: 'novus', t: '那就先看看。\n我陪你。', x: 0.3, y: 0.3, tail: 'right' }] },
     ],
   },
 };

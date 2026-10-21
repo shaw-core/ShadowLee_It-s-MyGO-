@@ -40,5 +40,5 @@ export const cheatUnlockAll = () => updateSave(d => {
   //   shadow 手账 · 魔法熊猫
   //   hack   手账 · 未授权附录（可从附录直接接入「世界尽头」）
   // 「回忆」靠「看过」记录显示，这里不动：标成已看会让关卡里的小剧场和关间漫画不再播放
-  for (const f of ['yua', 'pat', 'shadow', 'hack']) if (!d.flags.includes(f)) d.flags.push(f);
+  for (const f of ['yua', 'pat', 'shadow', 'hack', 'music:uaua_kanashibari']) if (!d.flags.includes(f)) d.flags.push(f);
 });

@@ -111,6 +111,8 @@ const GameEngine: React.FC<Props> = ({ level, cleared, paused, onFinish, onExit,
     let deaths = 0;
     let dead = 0;               // 死亡倒计时（帧）
     let landT = 0;              // 落地压缩
+    /** 弹簧床被踩到时，整张床垫一起起伏一下（x0..x1 是这一排连续的弹簧格） */
+    let bedWave: { x0: number; x1: number; y: number; cx: number; t: number } | null = null;
     let switchT = 1;            // 图层切换过场 0→1
     let lastSwitch = 0;
     let switchedOnce = false;
@@ -284,6 +286,15 @@ const GameEngine: React.FC<Props> = ({ level, cleared, paused, onFinish, onExit,
       const ev = step(body, { l: keys.l, r: keys.r, jump: jumpPressed, held: keys.held, down: keys.down }, world, lay);
       jumpPressed = false;
       if (ev.jumped) { sfx('jump'); sfxText('跳！', body.x - 6, body.y - 4, 16); }
+      if (ev.bounced) {
+        const fy = Math.floor((body.y + PH.h + 2) / TILE);
+        let fx = Math.floor((body.x + PH.w / 2) / TILE);
+        if (!world.spring(fx, fy)) fx = world.spring(fx - 1, fy) ? fx - 1 : fx + 1;
+        let x0 = fx, x1 = fx;
+        while (world.spring(x0 - 1, fy)) x0--;
+        while (world.spring(x1 + 1, fy)) x1++;
+        bedWave = { x0, x1, y: fy, cx: body.x + PH.w / 2, t: 0 };
+      }
       if (ev.bounced) { sfx('bounce'); sfxText('嘭——！', body.x - 4, body.y + 10, 22); burst(body.x + 5, body.y + PH.h, '#fbcfe8', 12, 1.5); }
       if (ev.landed !== undefined) {
         landT = 6;
@@ -404,6 +415,22 @@ const GameEngine: React.FC<Props> = ({ level, cleared, paused, onFinish, onExit,
       const src = ink ? statics.manga : statics.real;
       c.drawImage(src, Math.max(0, sx), Math.max(0, sy), VIEW_W, VIEW_H, Math.max(0, -sx), Math.max(0, -sy), VIEW_W, VIEW_H);
       c.drawImage(ink ? statics.ghostManga : statics.ghostReal, Math.max(0, sx), Math.max(0, sy), VIEW_W, VIEW_H, Math.max(0, -sx), Math.max(0, -sy), VIEW_W, VIEW_H);
+
+      // 弹簧床垫的起伏：从落点向两边荡开，整张床一起动
+      if (bedWave) {
+        bedWave.t += 1 / 60;
+        const k = 1 - bedWave.t / 0.45;
+        if (k <= 0) bedWave = null;
+        else {
+          c.fillStyle = ink ? '#1c1c2a' : '#7aa7e8';
+          const y0 = bedWave.y * TILE - camera.y;
+          for (let x = bedWave.x0 * TILE; x < (bedWave.x1 + 1) * TILE; x += 2) {
+            const dx = Math.abs(x - bedWave.cx);
+            const off = Math.sin(dx / 9 - bedWave.t * 26) * 2.4 * k * Math.max(0.25, 1 - dx / 200);
+            c.fillRect(Math.round(x - camera.x), Math.round(y0 - 6 + off), 2, 2);
+          }
+        }
+      }
 
       // 移动平台
       world.movers.forEach((m, k) => {

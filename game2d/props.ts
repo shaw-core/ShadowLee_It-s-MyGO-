@@ -146,11 +146,54 @@ export const PROPS: Record<string, PropDef> = {
       const p = new Pix(W, 60);
       p.rect(0, 4, 10, 56, '#a8754f'); p.rect(2, 6, 6, 50, '#c48f63');   // 床头
       p.rect(W - 8, 22, 8, 38, '#a8754f');
-      // 被子盖在床面上
+      // 床架与床腿
+      p.rect(10, 46, W - 18, 5, '#a8754f'); p.rect(10, 46, W - 18, 1, '#c48f63');
+      p.rect(16, 51, 5, 9, '#8a5d3b'); p.rect(W - 22, 51, 5, 9, '#8a5d3b');
+      // 弹簧床垫：整面都是弹簧，侧边一圈露出粉色的弹簧圈
+      p.rect(10, 36, W - 18, 10, '#ffffff');
+      p.rect(10, 36, W - 18, 1, '#e2e8f0'); p.rect(10, 45, W - 18, 1, '#cbd5e1');
+      for (let x = 12; x + 8 <= W - 8; x += 8) { p.line(x, 38, x + 4, 43, '#f472b6'); p.line(x + 4, 43, x + 8, 38, '#f472b6'); }
+      // 被子盖在床垫上
       p.rect(10, 26, W - 18, 10, '#bcd7ff');
       for (let x = 14; x < W - 12; x += 12) p.rect(x, 28, 6, 6, '#a5c6f8');
       p.ellipse(26, 25, 14, 6, '#ffffff'); p.ellipse(26, 25, 11, 4, '#f5f7ff');
-      p.rect(10, 36, W - 18, 2, '#7aa7e8');
+      p.rect(10, 35, W - 18, 1, '#7aa7e8');
+      return outline(p);
+    },
+    fg: true, dy: 0,
+  },
+  /** 真结局「她们的房间」里的床：普通床垫（没有弹簧圈）、床头两个蓬松的枕头、掀开一角的被子、坐着的熊猫玩偶 */
+  roomBed: {
+    draw: () => {
+      const W = 15 * 16;
+      const p = new Pix(W, 60);
+      p.rect(0, 4, 10, 56, '#a8754f'); p.rect(2, 6, 6, 50, '#c48f63');   // 床头
+      p.rect(W - 8, 22, 8, 38, '#a8754f');
+      p.rect(10, 46, W - 18, 5, '#a8754f'); p.rect(10, 46, W - 18, 1, '#c48f63');
+      p.rect(16, 51, 5, 9, '#8a5d3b'); p.rect(W - 22, 51, 5, 9, '#8a5d3b');
+      // 床垫 + 床单
+      p.rect(10, 34, W - 18, 12, '#f8fafc'); p.rect(10, 44, W - 18, 2, '#e2e8f0');
+      // 两个枕头：后面那个稍高、颜色暗一点；前面那个压出一道褶
+      p.ellipse(34, 24, 21, 8, '#dfe7f6'); p.ellipse(34, 23, 19, 6, '#eef2fb');
+      p.ellipse(30, 29, 20, 7, '#ffffff'); p.ellipse(30, 31, 18, 4, '#f1f5fd');
+      p.line(16, 29, 22, 28, '#d5deef'); p.line(36, 27, 44, 29, '#d5deef');
+      // 被子：盖住后三分之二，靠枕头这头翻折出白色被里
+      p.rect(64, 27, W - 72, 9, '#bcd7ff');
+      for (let x = 70; x < W - 12; x += 12) p.rect(x, 29, 6, 5, '#a5c6f8');
+      p.rect(58, 26, 8, 10, '#ffffff'); p.rect(58, 26, 8, 1, '#e2e8f0');
+      p.rect(64, 36, W - 72, 2, '#7aa7e8');
+      // 熊猫玩偶（坐在被子上，面朝外）
+      const X = 150, Y = 26;
+      p.ellipse(X, Y - 4, 7, 6, '#ffffff');                         // 身体
+      p.ellipse(X - 6, Y - 6, 2.5, 3.5, '#24252e'); p.ellipse(X + 6, Y - 6, 2.5, 3.5, '#24252e'); // 手
+      p.ellipse(X - 4, Y, 3, 2, '#24252e'); p.ellipse(X + 4, Y, 3, 2, '#24252e');               // 脚
+      p.px(X - 4, Y, '#f2a6ae'); p.px(X + 4, Y, '#f2a6ae');
+      p.circle(X - 6, Y - 20, 3, '#24252e'); p.circle(X + 6, Y - 20, 3, '#24252e');            // 耳朵
+      p.ellipse(X, Y - 14, 8, 7, '#ffffff');                        // 头
+      p.ellipse(X - 3.5, Y - 14, 2.2, 2.6, '#24252e'); p.ellipse(X + 3.5, Y - 14, 2.2, 2.6, '#24252e');
+      p.px(X - 3, Y - 15, '#ffffff'); p.px(X + 4, Y - 15, '#ffffff');
+      p.px(X, Y - 11, '#24252e'); p.rect(X - 7, Y - 11, 2, 1, '#f9b7c3'); p.rect(X + 6, Y - 11, 2, 1, '#f9b7c3');
+      p.rect(X - 5, Y - 8, 11, 2, '#93c5fd');                       // 蓝色小围巾
       return outline(p);
     },
     fg: true, dy: 0,

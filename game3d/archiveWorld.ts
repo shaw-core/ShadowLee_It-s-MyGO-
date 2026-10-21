@@ -1,10 +1,11 @@
 // ============================================================
-// 隐藏系统的「世界尽头」：星空、机房、系统世界树
+// 隐藏系统的「世界尽头」：星空、核心圆台、系统世界树
 //  · 宇宙：会闪的星星、一条斜挂的银河、几团星云、远处一道淡金色的光环
-//  · 地面：漂在虚空里的一块圆形金属台，边缘碎成方块慢慢飘走
-//  · 机房：一圈服务器机柜，指示灯在闪；线缆贴着地面流向中心
+//  · 核心圆台：漂在虚空里的一块圆形金属台，边缘碎成方块慢慢飘走（v0.16.1 起只是最深处的一个区）
 //  · 世界树：线缆拧成的树干，光从根部往上流；树冠是一片闪烁的数据，
 //    枝头挂着三个小世界（漫画 / 低模 / 还没上色的那一个）
+//    v0.16.1：树会随玩家走近逐渐显露（reveal 0~1）
+//  入口 / 电视迷宫 / VHS 网格通道 / 故障机房这些分区的几何在 archiveZones.ts
 // ============================================================
 import * as THREE from 'three';
 import { Vox } from './voxel';
@@ -15,7 +16,7 @@ const rnd = (seed: number) => { let s = seed >>> 0; return () => { s = (s * 1664
 
 // ---------------- 星空 ----------------
 const starMat = () => new THREE.ShaderMaterial({
-  uniforms: { time: { value: 0 }, pr: { value: Math.min(window.devicePixelRatio, 2) } },
+  uniforms: { time: { value: 0 }, pr: { value: Math.min(window.devicePixelRatio, 2) }, fade: { value: 1 } },
   vertexShader: `
     attribute float size; attribute float phase; attribute vec3 color;
     uniform float time; uniform float pr;
@@ -28,13 +29,13 @@ const starMat = () => new THREE.ShaderMaterial({
       vC = color;
     }`,
   fragmentShader: `
-    varying vec3 vC; varying float vA;
+    varying vec3 vC; varying float vA; uniform float fade;
     void main() {
       vec2 d = gl_PointCoord - 0.5;
       float r = length(d);
       float core = smoothstep(0.5, 0.0, r);
       float a = pow(core, 2.2) + 0.25 * smoothstep(0.08, 0.0, abs(d.x)) * smoothstep(0.5, 0.0, abs(d.y)) + 0.25 * smoothstep(0.08, 0.0, abs(d.y)) * smoothstep(0.5, 0.0, abs(d.x));
-      gl_FragColor = vec4(vC * vA, a * vA);
+      gl_FragColor = vec4(vC * vA * fade, a * vA * fade);
     }`,
   transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
 });
@@ -107,7 +108,8 @@ export const buildCosmos = (scene: THREE.Scene) => {
 };
 
 // ---------------- 地面 ----------------
-export const buildFloor = (world: THREE.Group, R: number) => {
+export const buildFloor = (parent: THREE.Group, R: number, cx = 0, cz = 0) => {
+  const world = new THREE.Group(); world.position.set(cx, 0, cz); parent.add(world);
   const mat = new THREE.ShaderMaterial({
     uniforms: { time: { value: 0 }, R: { value: R } },
     vertexShader: `varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
@@ -163,7 +165,7 @@ export const buildFloor = (world: THREE.Group, R: number) => {
 };
 
 // ---------------- 机房 ----------------
-const flowMat = (base: number, hi: number, speed: number, rep: number) => new THREE.ShaderMaterial({
+export const flowMat = (base: number, hi: number, speed: number, rep: number) => new THREE.ShaderMaterial({
   uniforms: { time: { value: 0 }, base: { value: new THREE.Color(base) }, hi: { value: new THREE.Color(hi) } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
   fragmentShader: `
@@ -178,81 +180,14 @@ const flowMat = (base: number, hi: number, speed: number, rep: number) => new TH
   toneMapped: false,
 });
 
-export const buildServerRoom = (world: THREE.Group, colliders: Collider[], gaps: number[]) => {
-  const RING = 18.2;
-  const racks: { x: number; z: number; a: number }[] = [];
-  const COUNT = 40;
-  for (let i = 0; i < COUNT; i++) {
-    const a = (i / COUNT) * Math.PI * 2;
-    const deg = ((a * 180) / Math.PI) % 360;
-    if (gaps.some(gd => Math.abs(((deg - gd + 540) % 360) - 180) < 11)) continue;
-    racks.push({ x: Math.sin(a) * RING, z: -Math.cos(a) * RING, a });
-  }
-  const rackGeo = new THREE.BoxGeometry(1.15, 3, 1.2);
-  const rackMat = new THREE.MeshStandardMaterial({ color: 0x0a0e1a, metalness: 0.65, roughness: 0.38 });
-  const rackMesh = new THREE.InstancedMesh(rackGeo, rackMat, racks.length);
-  const edgeGeo = new THREE.EdgesGeometry(rackGeo);
-  const edgeMat = new THREE.LineBasicMaterial({ color: 0x2a5d8a, transparent: true, opacity: 0.55 });
-  const LED_ROWS = 16, LED_COLS = 3;
-  const leds = new THREE.InstancedMesh(new THREE.BoxGeometry(0.07, 0.035, 0.02), new THREE.MeshBasicMaterial({ toneMapped: false }), racks.length * LED_ROWS * LED_COLS);
-  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
-  const ledCol = new THREE.Color();
-  let li = 0;
-  const r = rnd(3);
-  racks.forEach((rk, i) => {
-    const rot = Math.atan2(-rk.x, -rk.z); // 正面朝向中心
-    q.setFromAxisAngle(up, rot);
-    m4.compose(new THREE.Vector3(rk.x, 1.5, rk.z), q, new THREE.Vector3(1, 1, 1));
-    rackMesh.setMatrixAt(i, m4);
-    const e = new THREE.LineSegments(edgeGeo, edgeMat); e.position.set(rk.x, 1.5, rk.z); e.rotation.y = rot; world.add(e);
-    colliders.push({ x: rk.x, z: rk.z, r: 0.95 });
-    const fwd = new THREE.Vector3(Math.sin(rot), 0, Math.cos(rot));
-    const right = new THREE.Vector3(Math.cos(rot), 0, -Math.sin(rot));
-    for (let row = 0; row < LED_ROWS; row++) for (let col = 0; col < LED_COLS; col++) {
-      const p = new THREE.Vector3(rk.x, 0.4 + row * 0.16, rk.z).addScaledVector(fwd, 0.61).addScaledVector(right, -0.35 + col * 0.12 + (row % 2) * 0.02);
-      m4.compose(p, q, new THREE.Vector3(1, 1, 1));
-      leds.setMatrixAt(li, m4);
-      ledCol.setHex(r() < 0.75 ? 0x55e6ff : r() < 0.8 ? 0x36e07a : 0xffc46b).multiplyScalar(0.3 + r() * 0.9);
-      leds.setColorAt(li, ledCol);
-      li++;
-    }
-  });
-  world.add(rackMesh, leds);
-  // 机柜顶上的线槽（一整圈）
-
-  // 地上的线缆：从机柜流向世界树的根
-  const cableMats: THREE.ShaderMaterial[] = [];
-  racks.forEach((rk, i) => {
-    if (i % 2) return;
-    const start = new THREE.Vector3(rk.x * 0.96, 0.06, rk.z * 0.96);
-    const ang = Math.atan2(rk.z, rk.x) + (r() - 0.5) * 0.5;
-    const end = new THREE.Vector3(Math.cos(ang) * 2.2, 0.08, Math.sin(ang) * 2.2);
-    const mid = start.clone().lerp(end, 0.5).add(new THREE.Vector3((r() - 0.5) * 3, 0, (r() - 0.5) * 3));
-    const curve = new THREE.CatmullRomCurve3([start, mid, end]);
-    const m = flowMat(0x06202c, 0x63e8ff, 0.32 + r() * 0.2, 3);
-    cableMats.push(m);
-    world.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 40, 0.05, 5, false), m));
-  });
-  let last = 0;
-  return (t: number) => {
-    cableMats.forEach(m => { m.uniforms.time.value = t; });
-    if (t - last < 0.12) return;
-    last = t;
-    for (let k = 0; k < 40; k++) {
-      const i = Math.floor(r() * li);
-      ledCol.setHex(r() < 0.75 ? 0x55e6ff : r() < 0.85 ? 0x36e07a : r() < 0.97 ? 0xffc46b : 0xff5d6c).multiplyScalar(r() < 0.3 ? 0.15 : 0.5 + r() * 0.8);
-      leds.setColorAt(i, ledCol);
-    }
-    leds.instanceColor!.needsUpdate = true;
-  };
-};
-
 // ---------------- 世界树 ----------------
-export const buildWorldTree = (world: THREE.Group, colliders: Collider[]) => {
+export const buildWorldTree = (world: THREE.Group, colliders: Collider[], cx = 0, cz = 0) => {
   const r = rnd(42);
   const tree = new THREE.Group();
   tree.scale.setScalar(1.55);
+  tree.position.set(cx, 0, cz);
   world.add(tree);
+  let reveal = 1;
   const trunkMat = flowMat(0x07303a, 0x7ff5ff, 0.45, 2);
   const branchMat = flowMat(0x0a2f3d, 0xa8f8ff, 0.55, 3);
   const goldMat = flowMat(0x2a2208, 0xffd889, 0.5, 2);
@@ -273,7 +208,7 @@ export const buildWorldTree = (world: THREE.Group, colliders: Collider[]) => {
   }
   const core = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.55, 7.2, 12), new THREE.MeshBasicMaterial({ color: 0x0b4a5a }));
   core.position.y = 3.6; tree.add(core);
-  colliders.push({ x: 0, z: 0, r: 2.2 });
+  colliders.push({ x: cx, z: cz, r: 2.2 });
 
   // 树根：贴着地面散开
   for (let i = 0; i < 9; i++) {
@@ -380,9 +315,12 @@ export const buildWorldTree = (world: THREE.Group, colliders: Collider[]) => {
     tree.add(g); worlds.push(g);
   });
 
-  return (t: number) => {
+  const update = (t: number) => {
     mats.forEach(m => { m.uniforms.time.value = t; });
     leafMat.uniforms.time.value = t; upMat.uniforms.time.value = t;
+    leafMat.uniforms.fade.value = 0.12 + reveal * 0.88; upMat.uniforms.fade.value = reveal;
+    treeLight.intensity = 10 + 30 * reveal; crownLight.intensity = 4 + 12 * reveal;
+    (crownGlow.material as THREE.SpriteMaterial).opacity = 0.05 + 0.17 * reveal;
     // 上升的光点
     for (let i = 0; i < M; i++) {
       const s = upSeed[i];
@@ -403,4 +341,7 @@ export const buildWorldTree = (world: THREE.Group, colliders: Collider[]) => {
     (ringGlow.material as THREE.MeshBasicMaterial).opacity = 0.25 + Math.sin(t * 1.4) * 0.1;
     ringGlow.scale.setScalar(1 + ((t * 0.4) % 1) * 0.15);
   };
+  /** 0：远处只看得到一点光；1：走到核心，整棵树完全显露 */
+  const setReveal = (k: number) => { reveal = Math.max(0, Math.min(1, k)); };
+  return { update, setReveal };
 };

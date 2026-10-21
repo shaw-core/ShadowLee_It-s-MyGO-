@@ -1,0 +1,2635 @@
+{
+ "results": [
+  {
+   "test": "autoplay blocked → waiting for input",
+   "ok": true,
+   "detail": "{\"waitingForInput\": true, \"paused\": true}"
+  },
+  {
+   "test": "after input: playing, faded in, scene ducked",
+   "ok": true,
+   "detail": "{\"paused\": false, \"gain\": 1, \"t\": 3.08} duck=0"
+  },
+  {
+   "test": "before first encounter: walkman has 10 tracks, no unlock flag",
+   "ok": true,
+   "detail": "tracks=10 flags=['yua']"
+  },
+  {
+   "test": "U03 enter: uaua track playing at full gain, scene BGM ducked",
+   "ok": true,
+   "detail": "gain=1 vol=0.405 duck=0 t=12.72"
+  },
+  {
+   "test": "U03 fade-in ~1–2 s, scene BGM fade-out ~0.8–1.5 s",
+   "ok": true,
+   "detail": "(in-page trace every 50 ms) uaua fade-in slope → 1.5s total; scene BGM time-constant 0.32s → 95% down in 0.96s; first audible at 0.1s, gain=1 at 1.6s (includes main-thread stalls)"
+  },
+  {
+   "test": "volume follows master×bgm",
+   "ok": true,
+   "detail": "volume=0.405 expected=0.405"
+  },
+  {
+   "test": "playback time advances (real decode)",
+   "ok": true,
+   "detail": "12.72 → 15.65"
+  },
+  {
+   "test": "signal is audible near the start and near the end (RMS from captureStream)",
+   "ok": true,
+   "detail": "{\"head\": 0.2377518709456574, \"tail\": 0.1953445105416175, \"tailT\": 214.885866, \"afterLoopT\": 1.168}"
+  },
+  {
+   "test": "presence loop skips the 2.4 s tail silence and wraps to the music start",
+   "ok": true,
+   "detail": "t after crossing 217.9 → 1.17"
+  },
+  {
+   "test": "U06 first encounter unlocks exactly one new walkman track",
+   "ok": true,
+   "detail": "tracks=11 last=uaua_kanashibari"
+  },
+  {
+   "test": "U04a leave form: uaua paused, gain 0, scene BGM restored",
+   "ok": true,
+   "detail": "paused=True duck=0.999 scene=c2_2"
+  },
+  {
+   "test": "U04b level switch: presence ends, uaua silent, new level BGM restored",
+   "ok": true,
+   "detail": "scene c2_2 → c2_3 {\"origin\": null, \"paused\": true, \"gain\": 0} duck=1"
+  },
+  {
+   "test": "U04c back to menu: presence ends, title BGM restored",
+   "ok": true,
+   "detail": "scene=title"
+  },
+  {
+   "test": "U05 walkman active → uaua stays silent (player first)",
+   "ok": true,
+   "detail": "overlap samples=0"
+  },
+  {
+   "test": "U05 walkman stops → uaua fades in",
+   "ok": true,
+   "detail": "gain=1"
+  },
+  {
+   "test": "U05 walkman resumes → uaua fades out, never two recordings at normal volume",
+   "ok": true,
+   "detail": "late overlap samples=0 final paused=True"
+  },
+  {
+   "test": "U08 20 rapid toggles (even) → not present, silent, no duck left",
+   "ok": true,
+   "detail": "{\"origin\": null, \"paused\": true, \"gain\": 0}"
+  },
+  {
+   "test": "U08 21 rapid toggles (odd) → present and playing at full gain",
+   "ok": true,
+   "detail": "{\"origin\": \"secret_form\", \"paused\": false, \"gain\": 1}"
+  },
+  {
+   "test": "setPanda clears Yua through leave()",
+   "ok": true,
+   "detail": "origin=None"
+  },
+  {
+   "test": "walkman plays the unlocked track from its own entry",
+   "ok": true,
+   "detail": "{\"playing\": true, \"idx\": 10, \"mode\": \"one\", \"t\": 1.268221, \"dur\": 220.373333, \"name\": \"かなしばりに遭ったら · 如若遭遇梦魇\"}"
+  },
+  {
+   "test": "walkman reaches the end of the full track and loops (single-repeat mode)",
+   "ok": true,
+   "detail": "t after end = 0.985005"
+  },
+  {
+   "test": "unlock persists after reload",
+   "ok": true,
+   "detail": "tracks=11"
+  },
+  {
+   "test": "audio URL served with HTTP 200/206",
+   "ok": true,
+   "detail": "{\"http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3\": 206}"
+  },
+  {
+   "test": "no page errors / console errors",
+   "ok": true,
+   "detail": "[]"
+  },
+  {
+   "test": "U07 404: missing flagged, scene BGM keeps playing (not ducked)",
+   "ok": true,
+   "detail": "missing=True duck=1"
+  },
+  {
+   "test": "U07 404: shows '这首曲子的音源还没有安装。'",
+   "ok": true,
+   "detail": "6 samples show the notice"
+  },
+  {
+   "test": "U07 404: real HTTP 404, requested once, no error spam",
+   "ok": true,
+   "detail": "responses={'http://127.0.0.1:8097/audio/__missing__.mp3': 404} console errors=['Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED', 'Failed to load resource: the server responded with a status of 404 (File not found)']"
+  }
+ ],
+ "samples": [
+  {
+   "origin": "story",
+   "gain": 0.025,
+   "volume": 0.01,
+   "ctx": "running",
+   "paused": false,
+   "t": 0.24,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "⟡ 悠亚来了。",
+    "随身听新增曲目：《かなしばりに遭ったら》"
+   ],
+   "label": "after-first-input",
+   "wall": 0.01
+  },
+  {
+   "origin": "story",
+   "gain": 0.191,
+   "volume": 0.077,
+   "ctx": "running",
+   "paused": false,
+   "t": 0.5,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "⟡ 悠亚来了。",
+    "随身听新增曲目：《かなしばりに遭ったら》"
+   ],
+   "label": "after-first-input",
+   "wall": 0.26
+  },
+  {
+   "origin": "story",
+   "gain": 0.355,
+   "volume": 0.144,
+   "ctx": "running",
+   "paused": false,
+   "t": 0.76,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "⟡ 悠亚来了。",
+    "随身听新增曲目：《かなしばりに遭ったら》"
+   ],
+   "label": "after-first-input",
+   "wall": 0.53
+  },
+  {
+   "origin": "story",
+   "gain": 0.517,
+   "volume": 0.209,
+   "ctx": "running",
+   "paused": false,
+   "t": 1.02,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "⟡ 悠亚来了。",
+    "随身听新增曲目：《かなしばりに遭ったら》"
+   ],
+   "label": "after-first-input",
+   "wall": 0.78
+  },
+  {
+   "origin": "story",
+   "gain": 0.68,
+   "volume": 0.275,
+   "ctx": "running",
+   "paused": false,
+   "t": 1.28,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "⟡ 悠亚来了。",
+    "随身听新增曲目：《かなしばりに遭ったら》"
+   ],
+   "label": "after-first-input",
+   "wall": 1.04
+  },
+  {
+   "origin": "story",
+   "gain": 0.842,
+   "volume": 0.341,
+   "ctx": "running",
+   "paused": false,
+   "t": 1.53,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "⟡ 悠亚来了。",
+    "随身听新增曲目：《かなしばりに遭ったら》"
+   ],
+   "label": "after-first-input",
+   "wall": 1.3
+  },
+  {
+   "origin": "story",
+   "gain": 0.999,
+   "volume": 0.404,
+   "ctx": "running",
+   "paused": false,
+   "t": 1.79,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "⟡ 悠亚来了。",
+    "随身听新增曲目：《かなしばりに遭ったら》"
+   ],
+   "label": "after-first-input",
+   "wall": 1.56
+  },
+  {
+   "origin": "story",
+   "gain": 1,
+   "volume": 0.405,
+   "ctx": "running",
+   "paused": false,
+   "t": 2.05,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "⟡ 悠亚来了。",
+    "随身听新增曲目：《かなしばりに遭ったら》"
+   ],
+   "label": "after-first-input",
+   "wall": 1.82
+  },
+  {
+   "origin": "story",
+   "gain": 1,
+   "volume": 0.405,
+   "ctx": "running",
+   "paused": false,
+   "t": 2.31,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "随身听新增曲目：《かなしばりに遭ったら》"
+   ],
+   "label": "after-first-input",
+   "wall": 2.07
+  },
+  {
+   "origin": "story",
+   "gain": 1,
+   "volume": 0.405,
+   "ctx": "running",
+   "paused": false,
+   "t": 2.57,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "随身听新增曲目：《かなしばりに遭ったら》"
+   ],
+   "label": "after-first-input",
+   "wall": 2.33
+  },
+  {
+   "origin": "story",
+   "gain": 1,
+   "volume": 0.405,
+   "ctx": "running",
+   "paused": false,
+   "t": 2.83,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "随身听新增曲目：《かなしばりに遭ったら》"
+   ],
+   "label": "after-first-input",
+   "wall": 2.59
+  },
+  {
+   "origin": "story",
+   "gain": 1,
+   "volume": 0.405,
+   "ctx": "running",
+   "paused": false,
+   "t": 3.08,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "随身听新增曲目：《かなしばりに遭ったら》"
+   ],
+   "label": "after-first-input",
+   "wall": 2.85
+  },
+  {
+   "origin": "secret_form",
+   "gain": 1,
+   "volume": 0.405,
+   "ctx": "running",
+   "paused": false,
+   "t": 11.63,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_2"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "enter(secret_form)",
+   "wall": 0.01
+  },
+  {
+   "origin": "secret_form",
+   "gain": 1,
+   "volume": 0.405,
+   "ctx": "running",
+   "paused": false,
+   "t": 11.73,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_2"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "enter(secret_form)",
+   "wall": 0.12
+  },
+  {
+   "origin": "secret_form",
+   "gain": 1,
+   "volume": 0.405,
+   "ctx": "running",
+   "paused": false,
+   "t": 11.84,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_2"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "enter(secret_form)",
+   "wall": 0.22
+  },
+  {
+   "origin": "secret_form",
+   "gain": 1,
+   "volume": 0.405,
+   "ctx": "running",
+   "paused": false,
+   "t": 11.94,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_2"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "enter(secret_form)",
+   "wall": 0.33
+  },
+  {
+   "origin": "secret_form",
+   "gain": 1,
+   "volume": 0.405,
+   "ctx": "running",
+   "paused": false,
+   "t": 12.05,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_2"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "enter(secret_form)",
+   "wall": 0.44
+  },
+  {
+   "origin": "secret_form",
+   "gain": 1,
+   "volume": 0.405,
+   "ctx": "running",
+   "paused": false,
+   "t": 12.16,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_2"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "enter(secret_form)",
+   "wall": 0.54
+  },
+  {
+   "origin": "secret_form",
+   "gain": 1,
+   "volume": 0.405,
+   "ctx": "running",
+   "paused": false,
+   "t": 12.26,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_2"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "enter(secret_form)",
+   "wall": 0.65
+  },
+  {
+   "origin": "secret_form",
+   "gain": 1,
+   "volume": 0.405,
+   "ctx": "running",
+   "paused": false,
+   "t": 12.4,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_2"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "enter(secret_form)",
+   "wall": 0.79
+  },
+  {
+   "origin": "secret_form",
+   "gain": 1,
+   "volume": 0.405,
+   "ctx": "running",
+   "paused": false,
+   "t": 12.51,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_2"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "enter(secret_form)",
+   "wall": 0.9
+  },
+  {
+   "origin": "secret_form",
+   "gain": 1,
+   "volume": 0.405,
+   "ctx": "running",
+   "paused": false,
+   "t": 12.61,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_2"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "enter(secret_form)",
+   "wall": 1.0
+  },
+  {
+   "origin": "secret_form",
+   "gain": 1,
+   "volume": 0.405,
+   "ctx": "running",
+   "paused": false,
+   "t": 12.72,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_2"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "enter(secret_form)",
+   "wall": 1.11
+  },
+  {
+   "label": "enter(secret_form) in-page 50ms trace",
+   "trace": [
+    {
+     "ms": 84,
+     "gain": 0,
+     "duck": 1
+    },
+    {
+     "ms": 100,
+     "gain": 0.012,
+     "duck": 0.973
+    },
+    {
+     "ms": 150,
+     "gain": 0.046,
+     "duck": 0.827
+    },
+    {
+     "ms": 200,
+     "gain": 0.079,
+     "duck": 0.709
+    },
+    {
+     "ms": 250,
+     "gain": 0.112,
+     "duck": 0.607
+    },
+    {
+     "ms": 300,
+     "gain": 0.145,
+     "duck": 0.52
+    },
+    {
+     "ms": 350,
+     "gain": 0.18,
+     "duck": 0.442
+    },
+    {
+     "ms": 400,
+     "gain": 0.213,
+     "duck": 0.379
+    },
+    {
+     "ms": 1151,
+     "gain": 0.712,
+     "duck": 0.036
+    },
+    {
+     "ms": 1200,
+     "gain": 0.745,
+     "duck": 0.031
+    },
+    {
+     "ms": 1250,
+     "gain": 0.78,
+     "duck": 0.027
+    },
+    {
+     "ms": 1300,
+     "gain": 0.813,
+     "duck": 0.023
+    },
+    {
+     "ms": 1352,
+     "gain": 0.846,
+     "duck": 0.02
+    },
+    {
+     "ms": 1400,
+     "gain": 0.878,
+     "duck": 0.017
+    },
+    {
+     "ms": 1450,
+     "gain": 0.913,
+     "duck": 0.014
+    },
+    {
+     "ms": 1503,
+     "gain": 0.946,
+     "duck": 0.012
+    },
+    {
+     "ms": 1550,
+     "gain": 0.979,
+     "duck": 0.01
+    },
+    {
+     "ms": 1600,
+     "gain": 1,
+     "duck": 0.009
+    },
+    {
+     "ms": 1650,
+     "gain": 1,
+     "duck": 0.008
+    },
+    {
+     "ms": 1700,
+     "gain": 1,
+     "duck": 0.007
+    },
+    {
+     "ms": 1750,
+     "gain": 1,
+     "duck": 0.006
+    },
+    {
+     "ms": 1800,
+     "gain": 1,
+     "duck": 0.005
+    },
+    {
+     "ms": 1850,
+     "gain": 1,
+     "duck": 0.004
+    },
+    {
+     "ms": 1902,
+     "gain": 1,
+     "duck": 0.003
+    },
+    {
+     "ms": 1950,
+     "gain": 1,
+     "duck": 0.003
+    },
+    {
+     "ms": 2000,
+     "gain": 1,
+     "duck": 0.003
+    },
+    {
+     "ms": 2050,
+     "gain": 1,
+     "duck": 0.002
+    },
+    {
+     "ms": 2100,
+     "gain": 1,
+     "duck": 0.002
+    },
+    {
+     "ms": 2150,
+     "gain": 1,
+     "duck": 0.002
+    },
+    {
+     "ms": 2200,
+     "gain": 1,
+     "duck": 0.001
+    },
+    {
+     "ms": 2250,
+     "gain": 1,
+     "duck": 0.001
+    },
+    {
+     "ms": 2300,
+     "gain": 1,
+     "duck": 0.001
+    },
+    {
+     "ms": 2352,
+     "gain": 1,
+     "duck": 0.001
+    },
+    {
+     "ms": 2400,
+     "gain": 1,
+     "duck": 0.001
+    },
+    {
+     "ms": 2450,
+     "gain": 1,
+     "duck": 0.001
+    },
+    {
+     "ms": 2500,
+     "gain": 1,
+     "duck": 0.001
+    },
+    {
+     "ms": 2550,
+     "gain": 1,
+     "duck": 0
+    },
+    {
+     "ms": 2600,
+     "gain": 1,
+     "duck": 0
+    },
+    {
+     "ms": 2650,
+     "gain": 1,
+     "duck": 0
+    },
+    {
+     "ms": 2700,
+     "gain": 1,
+     "duck": 0
+    },
+    {
+     "ms": 2750,
+     "gain": 1,
+     "duck": 0
+    },
+    {
+     "ms": 2800,
+     "gain": 1,
+     "duck": 0
+    },
+    {
+     "ms": 2850,
+     "gain": 1,
+     "duck": 0
+    },
+    {
+     "ms": 2901,
+     "gain": 1,
+     "duck": 0
+    },
+    {
+     "ms": 2950,
+     "gain": 1,
+     "duck": 0
+    },
+    {
+     "ms": 3000,
+     "gain": 1,
+     "duck": 0
+    },
+    {
+     "ms": 3050,
+     "gain": 1,
+     "duck": 0
+    },
+    {
+     "ms": 3100,
+     "gain": 1,
+     "duck": 0
+    },
+    {
+     "ms": 3150,
+     "gain": 1,
+     "duck": 0
+    },
+    {
+     "ms": 3200,
+     "gain": 1,
+     "duck": 0
+    },
+    {
+     "ms": 3250,
+     "gain": 1,
+     "duck": 0
+    },
+    {
+     "ms": 3300,
+     "gain": 1,
+     "duck": 0
+    },
+    {
+     "ms": 3350,
+     "gain": 1,
+     "duck": 0
+    },
+    {
+     "ms": 3400,
+     "gain": 1,
+     "duck": 0
+    },
+    {
+     "ms": 3450,
+     "gain": 1,
+     "duck": 0
+    },
+    {
+     "ms": 3503,
+     "gain": 1,
+     "duck": 0
+    }
+   ]
+  },
+  {
+   "origin": null,
+   "gain": 0.983,
+   "volume": 0.398,
+   "ctx": "running",
+   "paused": false,
+   "t": 13.8,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 0.08,
+    "scene": "c2_2"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "她离开了。周围的声音慢慢恢复。"
+   ],
+   "label": "leave(form)",
+   "wall": 0.01
+  },
+  {
+   "origin": null,
+   "gain": 0.721,
+   "volume": 0.292,
+   "ctx": "running",
+   "paused": false,
+   "t": 14.06,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 0.549,
+    "scene": "c2_2"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "她离开了。周围的声音慢慢恢复。"
+   ],
+   "label": "leave(form)",
+   "wall": 0.26
+  },
+  {
+   "origin": null,
+   "gain": 0.472,
+   "volume": 0.191,
+   "ctx": "running",
+   "paused": false,
+   "t": 14.31,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 0.786,
+    "scene": "c2_2"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "她离开了。周围的声音慢慢恢复。"
+   ],
+   "label": "leave(form)",
+   "wall": 0.52
+  },
+  {
+   "origin": null,
+   "gain": 0.211,
+   "volume": 0.085,
+   "ctx": "running",
+   "paused": false,
+   "t": 14.57,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 0.898,
+    "scene": "c2_2"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "她离开了。周围的声音慢慢恢复。"
+   ],
+   "label": "leave(form)",
+   "wall": 0.78
+  },
+  {
+   "origin": null,
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": true,
+   "t": 14.81,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 0.952,
+    "scene": "c2_2"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "她离开了。周围的声音慢慢恢复。"
+   ],
+   "label": "leave(form)",
+   "wall": 1.04
+  },
+  {
+   "origin": null,
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": true,
+   "t": 14.81,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 0.977,
+    "scene": "c2_2"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "她离开了。周围的声音慢慢恢复。"
+   ],
+   "label": "leave(form)",
+   "wall": 1.3
+  },
+  {
+   "origin": null,
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": true,
+   "t": 14.81,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 0.99,
+    "scene": "c2_2"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "她离开了。周围的声音慢慢恢复。"
+   ],
+   "label": "leave(form)",
+   "wall": 1.58
+  },
+  {
+   "origin": null,
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": true,
+   "t": 14.81,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 0.995,
+    "scene": "c2_2"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "她离开了。周围的声音慢慢恢复。"
+   ],
+   "label": "leave(form)",
+   "wall": 1.84
+  },
+  {
+   "origin": null,
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": true,
+   "t": 14.81,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 0.998,
+    "scene": "c2_2"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "她离开了。周围的声音慢慢恢复。"
+   ],
+   "label": "leave(form)",
+   "wall": 2.1
+  },
+  {
+   "origin": null,
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": true,
+   "t": 14.81,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 0.999,
+    "scene": "c2_2"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "她离开了。周围的声音慢慢恢复。"
+   ],
+   "label": "leave(form)",
+   "wall": 2.4
+  },
+  {
+   "origin": "secret_form",
+   "gain": 1,
+   "volume": 0.405,
+   "ctx": "running",
+   "paused": false,
+   "t": 2.75,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_2"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "⟡ 悠亚来了。"
+   ],
+   "label": "switch level while present",
+   "wall": 0.01
+  },
+  {
+   "origin": null,
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": false,
+   "t": 5.76,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 1,
+    "scene": "c2_3"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "⟡ 悠亚来了。"
+   ],
+   "label": "switch level while present",
+   "wall": 3.02
+  },
+  {
+   "origin": null,
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": true,
+   "t": 5.78,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 1,
+    "scene": "c2_3"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "switch level while present",
+   "wall": 3.27
+  },
+  {
+   "origin": null,
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": true,
+   "t": 5.78,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 1,
+    "scene": "c2_3"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "switch level while present",
+   "wall": 3.53
+  },
+  {
+   "origin": null,
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": true,
+   "t": 5.78,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 1,
+    "scene": "c2_3"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "switch level while present",
+   "wall": 3.8
+  },
+  {
+   "origin": null,
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": true,
+   "t": 5.78,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 1,
+    "scene": "c2_3"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "switch level while present",
+   "wall": 4.05
+  },
+  {
+   "origin": null,
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": true,
+   "t": 5.78,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 1,
+    "scene": "c2_3"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "switch level while present",
+   "wall": 4.31
+  },
+  {
+   "origin": "secret_form",
+   "gain": 1,
+   "volume": 0.405,
+   "ctx": "running",
+   "paused": false,
+   "t": 3.59,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_3"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "menu while present",
+   "wall": 0.03
+  },
+  {
+   "origin": null,
+   "gain": 0.75,
+   "volume": 0.304,
+   "ctx": "running",
+   "paused": false,
+   "t": 3.85,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 0.494,
+    "scene": "title"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "menu while present",
+   "wall": 0.28
+  },
+  {
+   "origin": null,
+   "gain": 0.489,
+   "volume": 0.198,
+   "ctx": "running",
+   "paused": false,
+   "t": 4.11,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 0.76,
+    "scene": "title"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "menu while present",
+   "wall": 0.54
+  },
+  {
+   "origin": null,
+   "gain": 0.231,
+   "volume": 0.093,
+   "ctx": "running",
+   "paused": false,
+   "t": 4.37,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 0.885,
+    "scene": "title"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "menu while present",
+   "wall": 0.8
+  },
+  {
+   "origin": null,
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": false,
+   "t": 4.62,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 0.946,
+    "scene": "title"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "menu while present",
+   "wall": 1.06
+  },
+  {
+   "origin": null,
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": true,
+   "t": 4.63,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 0.974,
+    "scene": "title"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "menu while present",
+   "wall": 1.32
+  },
+  {
+   "origin": null,
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": true,
+   "t": 4.63,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 0.988,
+    "scene": "title"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "menu while present",
+   "wall": 1.58
+  },
+  {
+   "origin": null,
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": true,
+   "t": 4.63,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 0.994,
+    "scene": "title"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "menu while present",
+   "wall": 1.84
+  },
+  {
+   "origin": null,
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": true,
+   "t": 4.63,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 0.997,
+    "scene": "title"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "menu while present",
+   "wall": 2.1
+  },
+  {
+   "origin": null,
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": true,
+   "t": 4.63,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 0.999,
+    "scene": "title"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "menu while present",
+   "wall": 2.36
+  },
+  {
+   "origin": "secret_form",
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": true,
+   "t": 4.63,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": true,
+   "score": {
+    "reasons": [
+     "walkman"
+    ],
+    "suppressed": false,
+    "duckGain": 0.104,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "⟡ 悠亚来了。"
+   ],
+   "label": "walkman playing, then uaua enters",
+   "wall": 0.01
+  },
+  {
+   "origin": "secret_form",
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": true,
+   "t": 4.63,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": true,
+   "score": {
+    "reasons": [
+     "walkman"
+    ],
+    "suppressed": false,
+    "duckGain": 0.012,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "⟡ 悠亚来了。"
+   ],
+   "label": "walkman playing, then uaua enters",
+   "wall": 0.77
+  },
+  {
+   "origin": "secret_form",
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": true,
+   "t": 4.63,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": true,
+   "score": {
+    "reasons": [
+     "walkman"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "⟡ 悠亚来了。"
+   ],
+   "label": "walkman playing, then uaua enters",
+   "wall": 2.23
+  },
+  {
+   "origin": "secret_form",
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": true,
+   "t": 4.63,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": true,
+   "score": {
+    "reasons": [
+     "walkman"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "⟡ 悠亚来了。"
+   ],
+   "label": "walkman playing, then uaua enters",
+   "wall": 2.48
+  },
+  {
+   "origin": "secret_form",
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": true,
+   "t": 4.63,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 0.025,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "⟡ 悠亚来了。"
+   ],
+   "label": "walkman stopped while present",
+   "wall": 0.02
+  },
+  {
+   "origin": "secret_form",
+   "gain": 0.081,
+   "volume": 0.033,
+   "ctx": "running",
+   "paused": false,
+   "t": 0.32,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0.253,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "⟡ 悠亚来了。"
+   ],
+   "label": "walkman stopped while present",
+   "wall": 0.28
+  },
+  {
+   "origin": "secret_form",
+   "gain": 0.248,
+   "volume": 0.1,
+   "ctx": "running",
+   "paused": false,
+   "t": 0.57,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0.115,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "walkman stopped while present",
+   "wall": 0.53
+  },
+  {
+   "origin": "secret_form",
+   "gain": 0.42,
+   "volume": 0.17,
+   "ctx": "running",
+   "paused": false,
+   "t": 0.83,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0.051,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "walkman stopped while present",
+   "wall": 0.79
+  },
+  {
+   "origin": "secret_form",
+   "gain": 0.594,
+   "volume": 0.241,
+   "ctx": "running",
+   "paused": false,
+   "t": 1.09,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0.023,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "walkman stopped while present",
+   "wall": 1.05
+  },
+  {
+   "origin": "secret_form",
+   "gain": 0.766,
+   "volume": 0.31,
+   "ctx": "running",
+   "paused": false,
+   "t": 1.35,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0.01,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "walkman stopped while present",
+   "wall": 1.31
+  },
+  {
+   "origin": "secret_form",
+   "gain": 0.94,
+   "volume": 0.381,
+   "ctx": "running",
+   "paused": false,
+   "t": 1.61,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0.004,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "walkman stopped while present",
+   "wall": 1.57
+  },
+  {
+   "origin": "secret_form",
+   "gain": 1,
+   "volume": 0.405,
+   "ctx": "running",
+   "paused": false,
+   "t": 1.88,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0.002,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "walkman stopped while present",
+   "wall": 1.84
+  },
+  {
+   "origin": "secret_form",
+   "gain": 1,
+   "volume": 0.405,
+   "ctx": "running",
+   "paused": false,
+   "t": 2.13,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0.001,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "walkman stopped while present",
+   "wall": 2.09
+  },
+  {
+   "origin": "secret_form",
+   "gain": 1,
+   "volume": 0.405,
+   "ctx": "running",
+   "paused": false,
+   "t": 2.39,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "walkman stopped while present",
+   "wall": 2.35
+  },
+  {
+   "origin": "secret_form",
+   "gain": 1,
+   "volume": 0.405,
+   "ctx": "running",
+   "paused": false,
+   "t": 2.64,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [
+     "uaua"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "walkman stopped while present",
+   "wall": 2.6
+  },
+  {
+   "origin": "secret_form",
+   "gain": 1,
+   "volume": 0.405,
+   "ctx": "running",
+   "paused": false,
+   "t": 2.98,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": true,
+   "score": {
+    "reasons": [
+     "uaua",
+     "walkman"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "walkman resumes while present",
+   "wall": 0.04
+  },
+  {
+   "origin": "secret_form",
+   "gain": 0.396,
+   "volume": 0.161,
+   "ctx": "running",
+   "paused": false,
+   "t": 3.24,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": true,
+   "score": {
+    "reasons": [
+     "walkman"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "walkman resumes while present",
+   "wall": 0.3
+  },
+  {
+   "origin": "secret_form",
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": true,
+   "t": 3.37,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": true,
+   "score": {
+    "reasons": [
+     "walkman"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "walkman resumes while present",
+   "wall": 0.56
+  },
+  {
+   "origin": "secret_form",
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": true,
+   "t": 3.37,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": true,
+   "score": {
+    "reasons": [
+     "walkman"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "walkman resumes while present",
+   "wall": 0.82
+  },
+  {
+   "origin": "secret_form",
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": true,
+   "t": 3.37,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": true,
+   "score": {
+    "reasons": [
+     "walkman"
+    ],
+    "suppressed": false,
+    "duckGain": 0,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [],
+   "label": "walkman resumes while present",
+   "wall": 2.01
+  },
+  {
+   "origin": null,
+   "gain": 0.971,
+   "volume": 0.393,
+   "ctx": "running",
+   "paused": false,
+   "t": 2.3,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 0.089,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "⟡ 悠亚来了。",
+    "她离开了。周围的声音慢慢恢复。"
+   ],
+   "label": "panda replaces yua",
+   "wall": 0.04
+  },
+  {
+   "origin": null,
+   "gain": 0.681,
+   "volume": 0.276,
+   "ctx": "running",
+   "paused": false,
+   "t": 2.59,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 0.602,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "⟡ 悠亚来了。",
+    "她离开了。周围的声音慢慢恢复。"
+   ],
+   "label": "panda replaces yua",
+   "wall": 0.3
+  },
+  {
+   "origin": null,
+   "gain": 0.431,
+   "volume": 0.175,
+   "ctx": "running",
+   "paused": false,
+   "t": 2.84,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 0.81,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "⟡ 悠亚来了。",
+    "她离开了。周围的声音慢慢恢复。"
+   ],
+   "label": "panda replaces yua",
+   "wall": 0.56
+  },
+  {
+   "origin": null,
+   "gain": 0.161,
+   "volume": 0.065,
+   "ctx": "running",
+   "paused": false,
+   "t": 3.11,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 0.912,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "⟡ 悠亚来了。",
+    "她离开了。周围的声音慢慢恢复。"
+   ],
+   "label": "panda replaces yua",
+   "wall": 0.82
+  },
+  {
+   "origin": null,
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": true,
+   "t": 3.3,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 0.958,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "⟡ 悠亚来了。",
+    "她离开了。周围的声音慢慢恢复。"
+   ],
+   "label": "panda replaces yua",
+   "wall": 1.08
+  },
+  {
+   "origin": null,
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": true,
+   "t": 3.3,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 0.98,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "她离开了。周围的声音慢慢恢复。"
+   ],
+   "label": "panda replaces yua",
+   "wall": 1.34
+  },
+  {
+   "origin": null,
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": true,
+   "t": 3.3,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 0.99,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "她离开了。周围的声音慢慢恢复。"
+   ],
+   "label": "panda replaces yua",
+   "wall": 1.59
+  },
+  {
+   "origin": null,
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": true,
+   "t": 3.3,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 0.995,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "她离开了。周围的声音慢慢恢复。"
+   ],
+   "label": "panda replaces yua",
+   "wall": 1.85
+  },
+  {
+   "origin": null,
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": true,
+   "t": 3.3,
+   "dur": 220.37,
+   "readyState": 4,
+   "missing": false,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 0.998,
+    "scene": "c2_1"
+   },
+   "src": "http://127.0.0.1:5173/ShadowLee_It-s-MyGO-/audio/uaua_kanashibari.mp3",
+   "notices": [
+    "她离开了。周围的声音慢慢恢复。"
+   ],
+   "label": "panda replaces yua",
+   "wall": 2.1
+  },
+  {
+   "origin": "story",
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": false,
+   "t": 0.2,
+   "dur": null,
+   "readyState": 0,
+   "missing": true,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 1,
+    "scene": "title"
+   },
+   "src": "http://127.0.0.1:8097/audio/__missing__.mp3",
+   "notices": [
+    "⟡ 悠亚来了。",
+    "这首曲子的音源还没有安装。",
+    "随身听新增曲目：《かなしばりに遭ったら》"
+   ],
+   "label": "404 source (production build)",
+   "wall": 0.03
+  },
+  {
+   "origin": "story",
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": false,
+   "t": 0.2,
+   "dur": null,
+   "readyState": 0,
+   "missing": true,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 1,
+    "scene": "title"
+   },
+   "src": "http://127.0.0.1:8097/audio/__missing__.mp3",
+   "notices": [
+    "⟡ 悠亚来了。",
+    "这首曲子的音源还没有安装。",
+    "随身听新增曲目：《かなしばりに遭ったら》"
+   ],
+   "label": "404 source (production build)",
+   "wall": 0.29
+  },
+  {
+   "origin": "story",
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": false,
+   "t": 0.2,
+   "dur": null,
+   "readyState": 0,
+   "missing": true,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 1,
+    "scene": "title"
+   },
+   "src": "http://127.0.0.1:8097/audio/__missing__.mp3",
+   "notices": [
+    "⟡ 悠亚来了。",
+    "这首曲子的音源还没有安装。",
+    "随身听新增曲目：《かなしばりに遭ったら》"
+   ],
+   "label": "404 source (production build)",
+   "wall": 0.54
+  },
+  {
+   "origin": "story",
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": false,
+   "t": 0.2,
+   "dur": null,
+   "readyState": 0,
+   "missing": true,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 1,
+    "scene": "title"
+   },
+   "src": "http://127.0.0.1:8097/audio/__missing__.mp3",
+   "notices": [
+    "⟡ 悠亚来了。",
+    "这首曲子的音源还没有安装。",
+    "随身听新增曲目：《かなしばりに遭ったら》"
+   ],
+   "label": "404 source (production build)",
+   "wall": 0.8
+  },
+  {
+   "origin": "story",
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": false,
+   "t": 0.2,
+   "dur": null,
+   "readyState": 0,
+   "missing": true,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 1,
+    "scene": "title"
+   },
+   "src": "http://127.0.0.1:8097/audio/__missing__.mp3",
+   "notices": [
+    "⟡ 悠亚来了。",
+    "这首曲子的音源还没有安装。",
+    "随身听新增曲目：《かなしばりに遭ったら》"
+   ],
+   "label": "404 source (production build)",
+   "wall": 1.05
+  },
+  {
+   "origin": "story",
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": false,
+   "t": 0.2,
+   "dur": null,
+   "readyState": 0,
+   "missing": true,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 1,
+    "scene": "title"
+   },
+   "src": "http://127.0.0.1:8097/audio/__missing__.mp3",
+   "notices": [
+    "⟡ 悠亚来了。",
+    "这首曲子的音源还没有安装。",
+    "随身听新增曲目：《かなしばりに遭ったら》"
+   ],
+   "label": "404 source (production build)",
+   "wall": 1.31
+  },
+  {
+   "origin": "story",
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": false,
+   "t": 0.2,
+   "dur": null,
+   "readyState": 0,
+   "missing": true,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 1,
+    "scene": "title"
+   },
+   "src": "http://127.0.0.1:8097/audio/__missing__.mp3",
+   "notices": [
+    "随身听新增曲目：《かなしばりに遭ったら》"
+   ],
+   "label": "404 source (production build)",
+   "wall": 1.57
+  },
+  {
+   "origin": "story",
+   "gain": 0,
+   "volume": 0,
+   "ctx": "running",
+   "paused": false,
+   "t": 0.2,
+   "dur": null,
+   "readyState": 0,
+   "missing": true,
+   "waitingForInput": false,
+   "walkmanPlaying": false,
+   "score": {
+    "reasons": [],
+    "suppressed": false,
+    "duckGain": 1,
+    "scene": "title"
+   },
+   "src": "http://127.0.0.1:8097/audio/__missing__.mp3",
+   "notices": [
+    "随身听新增曲目：《かなしばりに遭ったら》"
+   ],
+   "label": "404 source (production build)",
+   "wall": 1.82
+  }
+ ]
+}

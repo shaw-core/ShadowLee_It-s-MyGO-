@@ -131,7 +131,15 @@ export const voxSpikes = (w: number, h: number, d: number, seed: number) => {
   const v = new Vox();
   const nx = Math.round(w / S), nz = Math.round(d / S), nh = Math.round(h / S);
   v.box(0, 0, 0, nx - 1, 0, nz - 1, 0x6b4a6e);
-  for (let x = 2; x < nx - 2; x += 5) for (let z = 2; z < nz - 2; z += 5) {
+  // 尖刺从两侧边缘对称铺满：最外一排的外沿离边 0.1m，正好对上伤害判定（四周各缩 0.1m），
+  // 不留「看起来是地面、碰到却会死」的空白带。间距不超过 5 格（0.5m）。
+  const spread = (n: number) => {
+    const a = 2, b = n - 3;
+    if (b <= a) return [Math.floor((n - 1) / 2)];
+    const k = Math.ceil((b - a) / 5);
+    return Array.from({ length: k + 1 }, (_, i) => Math.round(a + (i * (b - a)) / k));
+  };
+  for (const x of spread(nx)) for (const z of spread(nz)) {
     const top = nh - Math.floor(r() * 2);
     for (let y = 1; y <= top; y++) {
       const half = y < top * 0.45 ? 1 : 0;

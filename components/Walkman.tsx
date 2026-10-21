@@ -6,7 +6,9 @@
 // ============================================================
 import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Square, X, ListMusic } from 'lucide-react';
-import { walkman, sfx } from '../core/audio';
+import { walkman, sfx, uaua } from '../core/audio';
+import { UAUA_TRACK } from '../music';
+import { useSave } from '../core/save';
 import { score } from '../core/score';
 import { TRACKS } from '../core/tracks';
 
@@ -31,9 +33,11 @@ const MODES = [
 
 const Walkman: React.FC<{ hidden?: boolean }> = ({ hidden }) => {
   const st = useSyncExternalStore(walkman.subscribe, walkman.getSnapshot);
+  useSave();   // 解锁新曲目时曲单要跟着刷新
   const [open, setOpen] = useState(false);
   const [list, setList] = useState(false);
   const [sceneId, setSceneId] = useState<string | null>(score.current);
+  const [uauaOn, setUauaOn] = useState(false);
 
   useEffect(() => {
     const o = () => { setOpen(v => !v); sfx('click'); };
@@ -48,14 +52,15 @@ const Walkman: React.FC<{ hidden?: boolean }> = ({ hidden }) => {
   }, []);
   useEffect(() => {
     if (!open) return;
-    const t = setInterval(() => setSceneId(score.current), 700);
+    const t = setInterval(() => { setSceneId(score.current); setUauaOn(uaua.audible); }, 700);
     return () => clearInterval(t);
   }, [open]);
 
   if (hidden) return null;
-  const track = walkman.tracks[st.idx];
+  const tracks = walkman.tracks;
+  const track = tracks[st.idx] ?? tracks[0];
   const mode = MODES.find(m => m.id === st.mode) ?? MODES[0];
-  const sceneTitle = sceneId && TRACKS[sceneId] ? TRACKS[sceneId].title : '';
+  const sceneTitle = uauaOn ? UAUA_TRACK.name : sceneId && TRACKS[sceneId] ? TRACKS[sceneId].title : '';
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
   // 收起状态：只在放歌时留一个小标签
@@ -79,7 +84,7 @@ const Walkman: React.FC<{ hidden?: boolean }> = ({ hidden }) => {
       {list && (
         <div className="mb-2 bg-paper border-[3px] border-ink rounded-xl overflow-hidden" style={{ boxShadow: '4px 4px 0 0 #1e3a8a' }}>
           <div className="max-h-[38vh] overflow-y-auto scroll-thin py-1">
-            {walkman.tracks.map((t, i) => (
+            {tracks.map((t, i) => (
               <button key={t.url} onClick={() => { walkman.play(i); sfx('click'); }}
                       className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm ${i === st.idx ? 'bg-sakura-soft/60 font-bold text-ink' : 'text-ink/80 hover:bg-ink/5'}`}>
                 <span className="w-5 text-right text-[11px] text-ink/45 tabular-nums">{i + 1}</span>
@@ -103,7 +108,7 @@ const Walkman: React.FC<{ hidden?: boolean }> = ({ hidden }) => {
           {st.playing || st.t > 0 ? (
             <>
               <div className="flex items-center justify-between text-[10px] text-paper/60 tabular-nums">
-                <span>{String(st.idx + 1).padStart(2, '0')} / {String(walkman.tracks.length).padStart(2, '0')}</span>
+                <span>{String(st.idx + 1).padStart(2, '0')} / {String(tracks.length).padStart(2, '0')}</span>
                 <Eq on={st.playing} light />
               </div>
               <div className="overflow-hidden whitespace-nowrap text-sm font-bold mt-0.5">

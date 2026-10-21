@@ -35,7 +35,10 @@ class Score {
   private timer: ReturnType<typeof setInterval> | null = null;
   private layer: MusicLayer = 'real';
   private suppressed = false;
-  private ducked = false;
+  /** 让场景配乐让路的原因：walkman（随身听在放歌）/ uaua（悠亚的专属曲） */
+  private duckReasons = new Set<string>();
+  private uauaSince = 0;
+  private get ducked() { return this.duckReasons.size > 0; }
   private cache = new Map<string, Compiled>();
   started = false;
 
@@ -87,7 +90,16 @@ class Score {
   setLayer(l: MusicLayer) { if (l === this.layer) return; this.layer = l; this.applyLayer(false); }
   suppress(on: boolean) { this.suppressed = on; this.applyDuck(false); }
   /** 随身听在放歌 */
-  duckFor(on: boolean) { this.ducked = on; this.applyDuck(false); }
+  duckFor(on: boolean) { this.duckBy('walkman', on); }
+  /** 某个原因要求场景配乐让路 / 不再需要让路。uaua：约 1 秒淡出，淡完才停排音符 */
+  duckBy(reason: 'walkman' | 'uaua', on: boolean) {
+    if (on === this.duckReasons.has(reason)) return;
+    if (on) { this.duckReasons.add(reason); if (reason === 'uaua' && this.c) this.uauaSince = this.c.currentTime; }
+    else this.duckReasons.delete(reason);
+    this.applyDuck(false);
+  }
+  /** 调试用：当前的让路状态与增益 */
+  debugState() { return { reasons: [...this.duckReasons], suppressed: this.suppressed, duckGain: this.duck ? +this.duck.gain.value.toFixed(3) : null, scene: this.want }; }
 
   applyVolume() {
     if (!this.c) return;
@@ -101,7 +113,7 @@ class Score {
     const t = this.c.currentTime;
     this.duck.gain.cancelScheduledValues(t);
     if (instant) this.duck.gain.setValueAtTime(v, t);
-    else this.duck.gain.setTargetAtTime(v, t, this.suppressed ? 0.05 : 0.35);
+    else this.duck.gain.setTargetAtTime(v, t, this.suppressed ? 0.05 : this.duckReasons.has('uaua') && !this.duckReasons.has('walkman') ? 0.32 : 0.35);
   }
 
   private applyLayer(instant: boolean) {
@@ -161,7 +173,7 @@ class Score {
       if (p.stopping) continue;
       const def = p.comp.def;
       const stepDur = 60 / def.bpm / 4;
-      const quiet = this.suppressed || this.ducked;
+      const quiet = this.suppressed || this.duckReasons.has('walkman') || (this.duckReasons.has('uaua') && now - this.uauaSince > 1.4);
       // 落后太多（切到后台、页面卡住）：直接跳到现在，不要把错过的音一口气全补上——那会变成一团杂音
       if (p.next < now - 0.04) {
         const skip = Math.ceil((now + 0.02 - p.next) / stepDur);

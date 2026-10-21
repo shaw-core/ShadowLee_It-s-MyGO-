@@ -13,7 +13,7 @@ import { CH2_SCENES, CH2_LEVEL_SCENE, CH2_ALWAYS } from './story/chapter2';
 import { PAGES, CH2_MID_PAGE } from './story/cutscenes';
 import { Scene } from './story/types';
 import { useSave, getSave, updateSave, markSeen, hasSeen, SkinId } from './core/save';
-import { music, sfx } from './core/audio';
+import { music, sfx, leaveUauaPresence } from './core/audio';
 import { score } from './core/score';
 import { cheatUnlockAll, effectiveSkin, novusUnlocked, SPECIAL_CG_ID, statKey } from './core/progress';
 import { SPECIAL_CG_URL } from './constants';
@@ -30,6 +30,7 @@ import TrueEnding from './components/TrueEnding';
 import SpecialCG3D from './components/SpecialCG3D';
 import MatrixEnding from './components/MatrixEnding';
 import Walkman from './components/Walkman';
+import AudioNotice from './components/AudioNotice';
 
 type Ch = 1 | 2;
 type Screen =
@@ -102,6 +103,8 @@ const App: React.FC = () => {
 
   const anomalyVisible = screen.k === 'menu' && anomaly && !anomalyAcked;
   useEffect(() => { music.suppress(screen.k === 'matrix' || anomalyVisible); }, [screen.k, anomalyVisible]);
+  // 悠亚只会在关卡里出现：离开关卡画面（结算、菜单、终端……）时一定离场，恢复该画面的配乐
+  useEffect(() => { if (screen.k !== 'play') leaveUauaPresence('screen'); }, [screen.k]);
 
   // 场景配乐：跟着画面走（结算 / 空白 / 关卡中的对话沿用当前的曲子）
   const playCh = screen.k === 'play' ? screen.ch : 0;
@@ -146,6 +149,13 @@ const App: React.FC = () => {
   const play = useCallback((ch: Ch, idx: number) => {
     setScreen(prev => ({ k: 'play', ch, idx, run: (prev.k === 'play' ? prev.run : 0) + 1 }));
   }, []);
+
+  // 开发 / 验收：直接跳到某一关或回菜单（正式版不存在）
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    (window as any).__app = { play: (ch: Ch, idx: number) => { setStory(null); play(ch, idx); }, menu: () => { setStory(null); setScreen({ k: 'menu' }); }, screen: () => screenRef.current };
+  }, [play]);
+  const screenRef = useRef(screen); screenRef.current = screen;
 
   const startChapter = useCallback((ch: Ch, idx = 0) => {
     sfx('confirm');
@@ -340,6 +350,7 @@ const App: React.FC = () => {
 
       {storyNode}
       <Walkman hidden={screen.k === 'matrix' || anomalyVisible} />
+      <AudioNotice />
     </div>
   );
 };

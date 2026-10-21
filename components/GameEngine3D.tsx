@@ -28,7 +28,7 @@ import { buildDiorama, birdFlock, LEVEL_SETS, LEVEL_NIGHT } from '../game3d/dior
 import { voxIsland, voxSlab, voxCloud, voxFarIsland, voxSpikes, voxCandy, voxPage, voxMushroom, voxRing, voxCookie, voxGlass } from '../game3d/voxworld';
 import { BARKS_CH2, BarkEvent } from '../story/barks';
 import { getSave, updateSave, addFlag, hasSeen, hasFlag } from '../core/save';
-import { sfx } from '../core/audio';
+import { sfx, enterUauaPresence, leaveUauaPresence } from '../core/audio';
 import { score } from '../core/score';
 import { useChant } from '../core/voice';
 import PauseMenu from './ui/PauseMenu';
@@ -464,6 +464,11 @@ const GameEngine3D: React.FC<Props> = ({ level, skin, cleared, paused, onFinish,
         g.add(voxSpikes(w, h, d, seed));
         const ghost = mkGhost(w, h, d); g.add(ghost);
         push(e, g, { hw: w / 2 - 0.1, hh: h / 2 - 0.08, hd: d / 2 - 0.1 }, { ghost });
+        // 调试：?hzdebug 时用红框画出伤害判定，对照尖刺的实际绘制范围
+        if (import.meta.env.DEV && new URLSearchParams(location.search).has('hzdebug')) {
+          const box = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(w - 0.2, h - 0.16, d - 0.2)), new THREE.LineBasicMaterial({ color: 0xff0000, depthTest: false }));
+          box.renderOrder = 10; g.add(box);
+        }
       } else if (e.type === 'PAGE') {
         const page = new THREE.Group();
         page.add(voxPage());
@@ -736,7 +741,7 @@ const GameEngine3D: React.FC<Props> = ({ level, skin, cleared, paused, onFinish,
 
     // ---- 变身 ----
     const setPanda = (on: boolean) => {
-      if (on && s.yua) { s.yua = false; setYuaMode(false); yuaRig.group.visible = false; setYuaForm(false); }
+      if (on && s.yua) { s.yua = false; setYuaMode(false); yuaRig.group.visible = false; setYuaForm(false); leaveUauaPresence('form'); }
       s.panda = on;
       if (!s.isDead) { rig.group.visible = !on; pandaRig.group.visible = on; }
       setPandaMode(on);
@@ -752,6 +757,8 @@ const GameEngine3D: React.FC<Props> = ({ level, skin, cleared, paused, onFinish,
       if (!s.isDead) { rig.group.visible = !on; yuaRig.group.visible = on; }
       setYuaMode(on);
       if (on) addFlag('yua');
+      // 悠亚在场 → 专属曲；离场 → 恢复本关配乐（秘密形态复用剧情入场的同一套音乐逻辑）
+      if (on) enterUauaPresence('secret_form'); else leaveUauaPresence('form');
       setYuaForm(on);
       // 悠亚形态时室友姐不在身边；变回来时她出现在你旁边
       if (novus) {
@@ -769,7 +776,7 @@ const GameEngine3D: React.FC<Props> = ({ level, skin, cleared, paused, onFinish,
         }
       }
       applyLayer(s.layer);
-      showToast(on ? '⟡ 悠亚降临！所有次元同时存在' : '悠亚回去了……次元恢复分层', 2800);
+      showToast(on ? '所有次元同时存在' : '次元恢复分层', 2800);
       sfx('transform');
       particles.burst(new THREE.Vector3(s.p.x, s.p.y + 0.5, s.p.z), on ? 0xe8e8f0 : 0x93c5fd, 44, 3.2, 3.5);
     };
@@ -1508,6 +1515,7 @@ const GameEngine3D: React.FC<Props> = ({ level, skin, cleared, paused, onFinish,
 
     return () => {
       cancelAnimationFrame(raf);
+      leaveUauaPresence('unmount');   // 切关 / 重开 / 回菜单：悠亚一定离场
       if (respawnTimer !== undefined) clearTimeout(respawnTimer);
       ro.disconnect();
       window.removeEventListener('keydown', kd);

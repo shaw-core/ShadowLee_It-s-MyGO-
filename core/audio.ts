@@ -4,12 +4,15 @@
 //  · 随身听（这里）：一个小道具，可以放那几首 8bit 歌；放歌的时候场景配乐会安静下来
 //  · 合成音效（零素材，WebAudio 现场合成）
 // ============================================================
-import { BGM_TRACKS } from '../music';
-import { getSave, setSettings, PlayerState } from './save';
+import { BGM_TRACKS, EXTRA_TRACKS, UAUA_TRACK, UAUA_LOOP, BgmTrack } from '../music';
+import { getSave, setSettings, PlayerState, hasFlag, addFlag } from './save';
 import { score } from './score';
 
 // ---------------- 随身听 ----------------
 type Listener = () => void;
+const absUrl = (u: string) => { try { return new URL(u, location.href).href; } catch { return u; } };
+/** 随身听里现在能看到的曲目：固定的 10 首 + 已经解锁的追加曲（追加在末尾，前面的下标永远不变） */
+export const visibleTracks = (): BgmTrack[] => [...BGM_TRACKS, ...EXTRA_TRACKS.filter(t => !t.unlockFlag || hasFlag(t.unlockFlag))];
 class Walkman {
   private el: HTMLAudioElement | null = null;
   private suppressed = false;
@@ -17,7 +20,13 @@ class Walkman {
   private snap = { playing: false, idx: 0, mode: 'seq' as PlayerState['mode'], t: 0, dur: 0 };
   started = false;
 
-  get tracks() { return BGM_TRACKS; }
+  get tracks() { return visibleTracks(); }
+  /** 随身听真的在出声（不是暂停、不是被静音演出压住） */
+  get isPlaying() { return !!this.el && !this.el.paused && !this.suppressed; }
+  /** 随身听开始/停止出声时通知（悠亚的专属曲据此让路） */
+  private activeHooks = new Set<Listener>();
+  onActiveChange(l: Listener) { this.activeHooks.add(l); return () => { this.activeHooks.delete(l); }; }
+  private fireActive() { this.activeHooks.forEach(l => l()); }
   subscribe = (l: Listener) => { this.listeners.add(l); return () => { this.listeners.delete(l); }; };
   getSnapshot = () => this.snap;
   private emit() {
@@ -37,8 +46,13 @@ class Walkman {
       if (st.mode === 'one') { a.currentTime = 0; a.play().catch(() => {}); return; }
       this.next();
     };
-    a.onplay = () => { score.duckFor(true); this.emit(); };
-    a.onpause = () => { score.duckFor(false); this.emit(); };
+    a.onplay = () => { score.duckFor(true); this.emit(); this.fireActive(); };
+    a.onpause = () => { score.duckFor(false); this.emit(); this.fireActive(); };
+    a.onerror = () => {
+      // 追加曲（悠亚的歌）加载失败：提示一次，停下随身听，回到场景配乐
+      const tr = this.tracks[this.st().idx];
+      if (tr && EXTRA_TRACKS.includes(tr)) { notices.push(UAUA_TEXT.missing); this.set({ on: false }); this.emit(); this.fireActive(); }
+    };
     a.ontimeupdate = () => this.emit();
     a.onloadedmetadata = () => this.emit();
     this.el = a;
@@ -48,8 +62,9 @@ class Walkman {
   }
   private load(idx: number) {
     const a = this.el!;
-    const i = ((idx % BGM_TRACKS.length) + BGM_TRACKS.length) % BGM_TRACKS.length;
-    if (!a.src.endsWith(BGM_TRACKS[i].url)) a.src = BGM_TRACKS[i].url;
+    const list = this.tracks; const n = list.length;
+    const i = ((idx % n) + n) % n;
+    if (a.src !== absUrl(list[i].url)) a.src = list[i].url;
     if (i !== this.st().idx) this.set({ idx: i });
   }
   applyVolume() {
@@ -77,7 +92,7 @@ class Walkman {
   toggle() { const a = this.ensure(); if (a.paused) this.play(); else this.pause(); }
   next() {
     const st = this.st();
-    const n = BGM_TRACKS.length;
+    const n = this.tracks.length;
     const i = st.mode === 'shuffle' ? (st.idx + 1 + Math.floor(Math.random() * (n - 1))) % n : (st.idx + 1) % n;
     this.play(i);
   }
@@ -90,15 +105,222 @@ class Walkman {
     if (!this.el) return;
     if (on) { this.el.pause(); this.set({ on: this.st().on }); }
     else if (this.started && this.st().on) this.el.play().catch(() => {});
+    this.fireActive();
   }
 }
 export const walkman = new Walkman();
 
+// ---------------- 轻提示（音频相关的一句话） ----------------
+export const UAUA_TEXT = {
+  enter: '⟡ 悠亚来了。',
+  leave: '她离开了。周围的声音慢慢恢复。',
+  unlock: '随身听新增曲目：《かなしばりに遭ったら》',
+  missing: '这首曲子的音源还没有安装。',
+} as const;
+class Notices {
+  private seq = 0;
+  private items: { id: number; text: string }[] = [];
+  private ls = new Set<Listener>();
+  subscribe = (l: Listener) => { this.ls.add(l); return () => { this.ls.delete(l); }; };
+  getSnapshot = () => this.items;
+  push(text: string, ms = 3200) {
+    const id = ++this.seq;
+    this.items = [...this.items, { id, text }];
+    this.ls.forEach(l => l());
+    setTimeout(() => { this.items = this.items.filter(n => n.id !== id); this.ls.forEach(l => l()); }, ms);
+  }
+}
+export const notices = new Notices();
+
+// ============================================================
+// 悠亚在场：专属曲的生命周期
+//  · enterUauaPresence(origin) / leaveUauaPresence(reason)：重复调用无副作用
+//  · 入场：场景配乐约 1 秒淡出 → 专属曲约 1.5 秒淡入；在场期间循环（跳过首尾静音）
+//  · 离场：专属曲约 1 秒淡出后暂停，场景配乐恢复成「当前画面」该放的那首
+//  · 优先级：玩家主动在用随身听时，随身听优先——专属曲保持静音等候，随身听停下后再淡入；
+//    任何时候都只有一个录音在出声
+//  · 浏览器不许自动播放时：等下一次点击/按键再试，不刷报错
+//  · 音源加载失败：提示一次「这首曲子的音源还没有安装。」，场景配乐照常
+//  · 第一次遇见悠亚：随身听解锁这首歌（存档 flag: music:uaua_kanashibari）
+// ============================================================
+export type UauaOrigin = 'story' | 'secret_form';
+export type UauaLeaveReason = 'form' | 'unmount' | 'screen';
+const FADE_IN = 1.5, FADE_OUT = 1.0, FADE_YIELD = 0.25;   // 给随身听让路时要快，不能和玩家点的歌叠在一起
+
+class UauaChannel {
+  origin: UauaOrigin | null = null;
+  /** 专属曲的 <audio>（只读；调试/验收用） */
+  el: HTMLAudioElement | null = null;
+  // 音量走 WebAudio：<audio> → GainNode → 输出。淡入淡出在音频线程上按时间表执行，
+  // 不会因为切关时主线程忙着搭场景而卡住（卡住时用 <audio>.volume 的老办法会整段不动）
+  private ctx: AudioContext | null = null;
+  private g: GainNode | null = null;
+  private gain = 0;            // 逻辑音量 0~1（再乘 master×bgm）——仅在没有 WebAudio 时使用
+  private target = 0;
+  private fadeTimer: ReturnType<typeof setInterval> | ReturnType<typeof setTimeout> | null = null;
+  private fadeToken = 0;
+  private presenceId = 0;
+  private startedFor = -1;
+  private suppressed = false;
+  private missing = false;
+  private missingNoticed = false;
+  private gestureArmed = false;
+  private ducking = false;
+  readonly log: string[] = [];
+
+  private walkmanT: ReturnType<typeof setTimeout> | null = null;
+  // 随身听换曲时会先「暂停」一下再「播放」：稍等一拍再判断，免得专属曲在换曲的空隙里冒出来
+  constructor() { walkman.onActiveChange(() => { if (this.walkmanT) clearTimeout(this.walkmanT); this.walkmanT = setTimeout(() => { this.walkmanT = null; if (this.origin) this.sync('walkman'); }, 150); }); }
+
+  private note(msg: string) {
+    const line = `${(performance.now() / 1000).toFixed(2)}s ${msg}`;
+    this.log.push(line); if (this.log.length > 300) this.log.shift();
+  }
+  private vol() { const s = getSave().settings; return Math.max(0, Math.min(1, s.master * s.bgm)); }
+  private level() { if (this.g) { const v = this.vol(); return v > 1e-4 ? this.g.gain.value / v : this.target; } return this.gain; }
+  applyVolume() {
+    if (this.g && this.ctx) { if (!this.fadeTimer) { const t = this.ctx.currentTime; this.g.gain.cancelScheduledValues(t); this.g.gain.setTargetAtTime(this.target * this.vol(), t, 0.05); } return; }
+    if (this.el) this.el.volume = Math.max(0, Math.min(1, this.gain * this.vol()));
+  }
+  private graph() {
+    if (this.g || !this.el) return this.g;
+    try {
+      const C = window.AudioContext || (window as any).webkitAudioContext;
+      const ctx = new C(); const src = ctx.createMediaElementSource(this.el); const g = ctx.createGain();
+      g.gain.value = 0; src.connect(g); g.connect(ctx.destination);
+      this.ctx = ctx; this.g = g; this.el.volume = 1;
+    } catch { this.note('WebAudio unavailable → <audio>.volume fallback'); }
+    return this.g;
+  }
+
+  private ensure() {
+    if (this.el) return this.el;
+    const a = new Audio();
+    a.preload = 'auto';
+    a.loop = true;   // 兜底；正常情况下在 UAUA_LOOP.end 处跳回开头的音乐部分
+    a.src = UAUA_TRACK.url;
+    a.ontimeupdate = () => { if (this.origin && a.currentTime >= UAUA_LOOP.end) a.currentTime = UAUA_LOOP.start; };
+    a.onplaying = () => { this.note(`playing t=${a.currentTime.toFixed(2)}`); if (this.wants()) { this.setDuck(true); this.fadeTo(1, FADE_IN); } };
+    a.oncanplay = () => this.note(`canplay dur=${a.duration.toFixed(2)}`);
+    a.onerror = () => {
+      this.missing = true;
+      this.note(`error code=${a.error?.code ?? '?'} → 回退场景配乐`);
+      this.setDuck(false);
+      this.stopFade(); this.gain = 0; this.target = 0;
+      if (this.g && this.ctx) { this.g.gain.cancelScheduledValues(this.ctx.currentTime); this.g.gain.value = 0; }
+      if (!this.missingNoticed) { this.missingNoticed = true; notices.push(UAUA_TEXT.missing); }
+    };
+    this.el = a;
+    return a;
+  }
+  private setDuck(on: boolean) { if (this.ducking === on) return; this.ducking = on; score.duckBy('uaua', on); this.note(on ? 'scene BGM → fade out' : 'scene BGM → restore'); }
+  private stopFade() { if (this.fadeTimer) { clearInterval(this.fadeTimer as ReturnType<typeof setInterval>); clearTimeout(this.fadeTimer as ReturnType<typeof setTimeout>); this.fadeTimer = null; } this.fadeToken++; }
+  private fadeTo(target: number, sec: number, done?: () => void) {
+    this.stopFade();
+    const token = this.fadeToken;
+    this.target = target;
+    const g = this.graph();
+    if (g && this.ctx) {
+      const t = this.ctx.currentTime; const cur = g.gain.value;
+      g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(cur, t); g.gain.linearRampToValueAtTime(target * this.vol(), t + sec);
+      this.fadeTimer = setTimeout(() => { if (token !== this.fadeToken) return; this.fadeTimer = null; this.note(`fade → ${target} done (${sec}s)`); done?.(); }, sec * 1000 + 30);
+      return;
+    }
+    const from = this.gain; const t0 = performance.now();
+    this.fadeTimer = setInterval(() => {
+      if (token !== this.fadeToken) return;
+      const k = Math.min(1, (performance.now() - t0) / (sec * 1000));
+      this.gain = from + (target - from) * k;
+      this.applyVolume();
+      if (k >= 1) { this.stopFade(); this.note(`fade → ${target} done (${sec}s)`); done?.(); }
+    }, 40);
+  }
+  private wants() { return !!this.origin && !this.suppressed && !this.missing && !walkman.isPlaying; }
+
+  private armGesture() {
+    if (this.gestureArmed) return;
+    this.gestureArmed = true;
+    const retry = () => { this.disarmGesture(); if (this.wants()) this.sync('gesture'); };
+    this.disarm = () => { window.removeEventListener('pointerdown', retry, true); window.removeEventListener('keydown', retry, true); };
+    window.addEventListener('pointerdown', retry, true); window.addEventListener('keydown', retry, true);
+    this.note('autoplay blocked → wait for next input');
+  }
+  private disarm: () => void = () => {};
+  private disarmGesture() { if (!this.gestureArmed) return; this.gestureArmed = false; this.disarm(); }
+
+  private sync(why: string) {
+    const a = this.ensure();
+    if (this.wants()) {
+      if (this.startedFor !== this.presenceId) {
+        this.startedFor = this.presenceId;
+        try { a.currentTime = UAUA_LOOP.start; } catch { /* 元数据还没到 */ }
+      }
+      this.note(`sync(${why}) → play`);
+      this.graph();
+      if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
+      const p = a.play();
+      p?.then(() => {
+        // <audio> 能放但音频图还没被允许启动：同样等下一次输入
+        if (this.ctx && this.ctx.state !== 'running') this.armGesture(); else this.disarmGesture();
+      }).catch((e: DOMException) => {
+        if (e?.name === 'NotAllowedError') this.armGesture();
+        else if (e?.name !== 'AbortError') this.note(`play() rejected: ${e?.name}`);
+      });
+      if (!a.paused && a.readyState >= 3) { this.setDuck(true); this.fadeTo(1, FADE_IN); }
+    } else {
+      this.note(`sync(${why}) → quiet`);
+      this.disarmGesture();
+      this.setDuck(false);
+      if (a.paused) { this.stopFade(); this.gain = 0; this.target = 0; if (this.g && this.ctx) { this.g.gain.cancelScheduledValues(this.ctx.currentTime); this.g.gain.value = 0; } return; }
+      this.fadeTo(0, why === 'walkman' ? FADE_YIELD : FADE_OUT, () => { if (!this.wants()) { a.pause(); this.note('paused'); } });
+    }
+  }
+
+  enter(origin: UauaOrigin) {
+    if (this.origin) { this.note(`enter(${origin}) ignored: already present`); return; }
+    this.origin = origin; this.presenceId++;
+    // 音源加载失败过：这次游戏里不再反复请求（刷新页面后会重试），场景配乐照常
+    this.note(`enter(${origin})`);
+    window.dispatchEvent(new CustomEvent('uaua:enter', { detail: { origin } }));
+    notices.push(UAUA_TEXT.enter);
+    if (UAUA_TRACK.unlockFlag && !hasFlag(UAUA_TRACK.unlockFlag)) {
+      addFlag(UAUA_TRACK.unlockFlag);
+      this.note('walkman unlock: uaua_kanashibari');
+      setTimeout(() => notices.push(UAUA_TEXT.unlock, 4200), 900);
+    }
+    this.sync('enter');
+  }
+  leave(reason: UauaLeaveReason) {
+    if (!this.origin) return;
+    this.note(`leave(${reason})`);
+    this.origin = null;
+    window.dispatchEvent(new CustomEvent('uaua:leave', { detail: { reason } }));
+    if (reason === 'form') notices.push(UAUA_TEXT.leave);
+    this.sync('leave');
+  }
+  suppress(on: boolean) { if (this.suppressed === on) return; this.suppressed = on; if (this.origin) this.sync('suppress'); }
+  /** 现在场景里响着的是悠亚的歌（给随身听屏幕显示「正在听这里的声音」用） */
+  get audible() { return !!this.origin && !!this.el && !this.el.paused && this.target > 0; }
+  debug() {
+    const a = this.el;
+    return {
+      origin: this.origin, gain: +this.level().toFixed(3), volume: this.g ? +this.g.gain.value.toFixed(3) : a ? +a.volume.toFixed(3) : null, ctx: this.ctx?.state ?? null,
+      paused: a ? a.paused : null, t: a ? +a.currentTime.toFixed(2) : null, dur: a && isFinite(a.duration) ? +a.duration.toFixed(2) : null,
+      readyState: a?.readyState ?? null, missing: this.missing, waitingForInput: this.gestureArmed,
+      walkmanPlaying: walkman.isPlaying, score: score.debugState(), src: a?.src ?? null,
+    };
+  }
+}
+export const uaua = new UauaChannel();
+export const enterUauaPresence = (origin: UauaOrigin) => uaua.enter(origin);
+export const leaveUauaPresence = (reason: UauaLeaveReason = 'form') => uaua.leave(reason);
+if (typeof window !== 'undefined' && (import.meta.env.DEV || new URLSearchParams(location.search).has('audiolog'))) { (window as any).__uaua = uaua; (window as any).__walkman = walkman; }
+
 /** 总入口：给 App / 设置用 */
 export const music = {
   start() { score.start(); walkman.start(); },
-  suppress(on: boolean) { score.suppress(on); walkman.suppress(on); },
-  applyVolume() { score.applyVolume(); walkman.applyVolume(); },
+  suppress(on: boolean) { score.suppress(on); walkman.suppress(on); uaua.suppress(on); },
+  applyVolume() { score.applyVolume(); walkman.applyVolume(); uaua.applyVolume(); },
 };
 
 // ---------------- 合成音效 ----------------

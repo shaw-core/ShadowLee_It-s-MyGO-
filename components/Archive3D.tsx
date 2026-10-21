@@ -1,5 +1,7 @@
 // ============================================================
 // 隐藏系统 · 3D 档案馆（/SYSTEM_HIDDEN）
+//  v0.16.1：空间重建为四个分区（入口电视迷宫 → VHS 网格通道 → 故障机房 → 世界树核心），
+//  布局与坐标见 game3d/archiveLayout.ts，几何组件见 game3d/archiveZones.ts。
 //  · 只有电视头小豆一个人能进来。这里没有时间戳，不在任何一条故事线上。
 //  · 每份记录是一件摆在黑暗里的「东西」：走近，按 F 读取。
 //    读取时，除了文字，周围的东西也会跟着动——世界会变薄、镜子里的人会转头、
@@ -18,7 +20,8 @@ import { buildCharacter, buildCheckpointPanda, CharacterRig } from '../game3d/ch
 import { LEVELS3D } from '../game3d/levels3d';
 import { Vox } from '../game3d/voxel';
 import { getSave } from '../core/save';
-import { buildCosmos, buildFloor, buildServerRoom, buildWorldTree, softSprite, Collider } from '../game3d/archiveWorld';
+import { buildCosmos, softSprite } from '../game3d/archiveWorld';
+import { buildArchiveZones, walkable, SPAWN, STATIONS, TRAIL, KIMO_POS, CRACK_POS } from '../game3d/archiveLayout';
 
 export interface ArchiveFile { name: string; size: string; content: string | null }
 
@@ -137,7 +140,9 @@ const Archive3D: React.FC<Props> = ({ files, pageCipher, collectedPages, sealedC
     const W = () => mount.clientWidth, H = () => mount.clientHeight;
     let renderer: THREE.WebGLRenderer;
     try { renderer = new THREE.WebGLRenderer({ antialias: true }); } catch { return; }
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, getSave().settings.quality === 'low' ? 1 : 1.75));
+    const st0 = getSave().settings;
+    const zoneOpts = { low: st0.quality === 'low', reduce: st0.reduceMotion };
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, zoneOpts.low ? 1 : st0.quality === 'medium' ? 1.4 : 1.75));
     renderer.setSize(W(), H());
     renderer.toneMapping = THREE.NeutralToneMapping;
     renderer.shadowMap.enabled = false;
@@ -154,7 +159,8 @@ const Archive3D: React.FC<Props> = ({ files, pageCipher, collectedPages, sealedC
 
     const composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));
-    const bloom = new UnrealBloomPass(new THREE.Vector2(W(), H()), 0.85, 0.6, 0.55);
+    const bloom = new UnrealBloomPass(new THREE.Vector2(W(), H()), 0.6, 0.55, 0.72);
+    bloom.enabled = !zoneOpts.low;   // 低画质：关掉泛光，几何一件不少
     composer.addPass(bloom);
     composer.addPass(new OutputPass());
 
@@ -162,13 +168,11 @@ const Archive3D: React.FC<Props> = ({ files, pageCipher, collectedPages, sealedC
     const world = new THREE.Group();
     scene.add(world);
 
-    // ---- 世界尽头：星空 / 漂浮的圆台 / 机房 / 世界树 ----
-    const R = 22;
-    const colliders: Collider[] = [];
+    // ---- 世界尽头：星空 + 四个分区（入口电视迷宫 / VHS 网格通道 / 故障机房 / 世界树核心） ----
     const updCosmos = buildCosmos(scene);
-    const updFloor = buildFloor(world, R);
-    const updRoom = buildServerRoom(world, colliders, [0, 90, 180, 270]);
-    const updTree = buildWorldTree(world, colliders);
+    const Z = buildArchiveZones(world, zoneOpts);
+    const colliders = Z.colliders;
+    const boxes = Z.boxes;
 
     // ---- 天上的裂缝（09）：从缝里漏出一点别的颜色 ----
     const crack = new THREE.Group();
@@ -180,7 +184,7 @@ const Archive3D: React.FC<Props> = ({ files, pageCipher, collectedPages, sealedC
         const sp = softSprite(c, sz, 0.4); sp.position.set(x, y, -1); crack.add(sp);
       }
     }
-    crack.position.set(-70, 34, -46); crack.lookAt(0, 8, 0);
+    crack.position.copy(CRACK_POS); crack.lookAt(0, 8, -37);
     scene.add(crack);
 
     // ---- 电视头小豆 ----
@@ -188,7 +192,7 @@ const Archive3D: React.FC<Props> = ({ files, pageCipher, collectedPages, sealedC
     world.add(rig.group);
     const headLight = new THREE.PointLight(0x7db4ff, 6, 7, 1.6);
     headLight.position.set(0, 1.25, 0.25); rig.group.add(headLight);
-    const P = { x: 0, y: 0, z: 13, vy: 0, face: Math.PI, grounded: true };
+    const P = { x: SPAWN.x, y: 0, z: SPAWN.z, vy: 0, face: SPAWN.face, grounded: true };
 
     // ---- 文件 → 记录点 ----
     const stations: Station[] = [];
@@ -200,11 +204,12 @@ const Archive3D: React.FC<Props> = ({ files, pageCipher, collectedPages, sealedC
       d.textContent = text;
       return new CSS2DObject(d);
     };
-    const addStation = (name: string, angleDeg: number, radius: number, ringR: number, build: (g: THREE.Group) => Station['update'], lbl?: string, labelY = 2.4) => {
-      const a = (angleDeg * Math.PI) / 180;
-      const pos = new THREE.Vector3(Math.sin(a) * ringR, 0, -Math.cos(a) * ringR);
+    // v0.16.1：记录点用显式世界坐标（archiveLayout.ts 的 STATIONS），不再摆在一圈环带上
+    const addStation = (name: string, radius: number, build: (g: THREE.Group) => Station['update'], lbl?: string, labelY = 2.4) => {
+      const L = STATIONS[name];
+      const pos = new THREE.Vector3(L.x, 0, L.z);
       const group = new THREE.Group(); group.position.copy(pos);
-      group.rotation.y = Math.atan2(-pos.x, -pos.z); // 面朝中心
+      group.rotation.y = Math.atan2(L.face[0] - L.x, L.face[1] - L.z); // 本地 +z 对着 face 点
       world.add(group);
       const f = fileByName(name);
       const kind = name === '__exit' ? 'exit' : name.startsWith('__') ? 'none' : f?.content === null ? 'lock' : f?.content === 'ENCRYPTED' ? 'enc' : 'file';
@@ -221,7 +226,7 @@ const Archive3D: React.FC<Props> = ({ files, pageCipher, collectedPages, sealedC
     const since = (s: Station, t: number) => (s.activeAt < 0 ? Infinity : t - s.activeAt);
 
     // 1) 草稿页：五张纸绕着基座转
-    addStation('draft_pages.dat', 200, 1.3, 9, g => {
+    addStation('draft_pages.dat', 1.3, g => {
       g.add(pedestal(1.2, 0.6, 1.2));
       const pages: THREE.Mesh[] = [];
       pageCipher.forEach(([id, label2, cipher], i) => {
@@ -253,7 +258,7 @@ const Archive3D: React.FC<Props> = ({ files, pageCipher, collectedPages, sealedC
 
     // 2) 新闻墙：一排屏幕滚着标题。读取时——世界变薄
     let thinAt = -1;
-    addStation('news_archive.txt', 245, 2.2, 13, g => {
+    addStation('news_archive.txt', 2.2, g => {
       const content = fileByName('news_archive.txt')?.content ?? '';
       const heads = content.split('\n').filter(l => l.startsWith('「')).map(l => l.replace(/[「」]/g, ''));
       const screens: { c: ReturnType<typeof canvasTex>; off: number }[] = [];
@@ -292,7 +297,7 @@ const Archive3D: React.FC<Props> = ({ files, pageCipher, collectedPages, sealedC
     }, undefined, 3.2);
 
     // 3) P.A.N.D.A.：一层套一层的盒子（最里面是一页漫画，外面一层是一座低模小岛）
-    addStation('panda_plan.doc', 290, 1.6, 13, g => {
+    addStation('panda_plan.doc', 1.6, g => {
       g.add(pedestal(1.6, 0.4, 1.6));
       const boxes: THREE.Object3D[] = [];
       [2.1, 1.45, 0.9].forEach((s2, i) => {
@@ -322,7 +327,7 @@ const Archive3D: React.FC<Props> = ({ files, pageCipher, collectedPages, sealedC
     }, undefined, 3.3);
 
     // 4) 事故 0x02：沙箱的一面墙碎了，两个人影手牵着手站在外面
-    addStation('incident_0x02.log', 335, 1.9, 13, g => {
+    addStation('incident_0x02.log', 1.9, g => {
       const box = edges(new THREE.BoxGeometry(2.4, 1.8, 1.6), 0x6ee7f2, 0.6); box.position.set(-0.6, 0.9, -0.6); g.add(box);
       const shards: THREE.Mesh[] = [];
       for (let i = 0; i < 9; i++) {
@@ -359,7 +364,7 @@ const Archive3D: React.FC<Props> = ({ files, pageCipher, collectedPages, sealedC
     // 5) TVHEAD 追踪：一面镜子。读过以后，镜子里的她会转过头去看裂缝
     let mirrorRig: CharacterRig | null = null;
     let mirrorMsg: THREE.Mesh | null = null;
-    const mirrorSt = addStation('trace_tvhead.log', 20, 1.8, 13, g => {
+    const mirrorSt = addStation('trace_tvhead.log', 1.8, g => {
       const frame = new THREE.Mesh(new THREE.BoxGeometry(2.6, 3.4, 0.25), new THREE.MeshStandardMaterial({ color: 0x0b120f, metalness: 0.5, roughness: 0.4 }));
       frame.position.set(0, 1.7, -0.15); g.add(frame);
       // 镜子后面是一个小房间，镜像站在里面
@@ -384,15 +389,18 @@ const Archive3D: React.FC<Props> = ({ files, pageCipher, collectedPages, sealedC
 
     // 地上的一串蓝色锚点：从门口一直延伸到裂缝那边（读过追踪记录后会亮起来）
     const trail: THREE.Mesh[] = [];
-    for (let i = 0; i < 22; i++) {
-      const a = new THREE.Mesh(new THREE.OctahedronGeometry(0.1), glowMat(0x7db4ff, 0.35));
-      const k = i / 21;
-      a.position.set(THREE.MathUtils.lerp(0.5, -6, k) + Math.sin(i * 0.9) * 0.6, 0.12, THREE.MathUtils.lerp(10, -20.5, k));
-      world.add(a); trail.push(a);
+    {
+      const path = new THREE.CatmullRomCurve3(TRAIL.map(([x, z]) => new THREE.Vector3(x, 0.12, z)));
+      const anchorGeo = new THREE.OctahedronGeometry(0.1);
+      for (let i = 0; i < 34; i++) {
+        const a = new THREE.Mesh(anchorGeo, glowMat(0x7db4ff, 0.35));
+        a.position.copy(path.getPointAt(i / 33)); a.position.x += Math.sin(i * 0.9) * 0.35;
+        world.add(a); trail.push(a);
+      }
     }
 
     // 6) L3 世界重排：三块平台，会自己咔哒归位（也会有一帧没对齐）
-    addStation('level3_shift.src', 65, 1.8, 13, g => {
+    addStation('level3_shift.src', 1.8, g => {
       const slab = (c: number) => { const m = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.12, 0.8), new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.25 })); g.add(m); return m; };
       const a = slab(0xf5a3cf), b = slab(0x8fc7f2), c = slab(0xffd36e);
       const from = [new THREE.Vector3(-0.9, 1.0, -0.4), new THREE.Vector3(0.8, 1.6, 0.3), new THREE.Vector3(0.1, 2.3, -0.6)];
@@ -444,11 +452,11 @@ const Archive3D: React.FC<Props> = ({ files, pageCipher, collectedPages, sealedC
         (beam.material as THREE.SpriteMaterial).opacity = k < 12 ? 0.5 : 0.18;
       };
     };
-    addStation('snap_L1.txt', 110, 1.6, 13, holo(0), undefined, 2.9);
-    addStation('snap_L3.txt', 155, 1.6, 13, holo(2), undefined, 2.9);
+    addStation('snap_L1.txt', 1.6, holo(0), undefined, 2.9);
+    addStation('snap_L3.txt', 1.6, holo(2), undefined, 2.9);
 
     // 9) version.log：一台旧显示器
-    addStation('version.log', 160, 1.2, 8, g => {
+    addStation('version.log', 1.2, g => {
       const body = new Vox(); body.box(-5, 0, -4, 5, 8, 4, 0xc9c2a8); body.box(-6, -4, -5, 6, -1, 5, 0xb8b199);
       const bm = voxMesh(body, 0.09); bm.position.y = 0.9; g.add(bm);
       const scr = canvasTex(160, 120, x => { x.fillStyle = '#031208'; x.fillRect(0, 0, 160, 120); x.fillStyle = '#36e07a'; x.font = '10px monospace'; ['changelog', '----------', 'v0.14.0', 'v0.13.8', 'v0.13.7', '...'].forEach((l, i) => x.fillText(l, 10, 18 + i * 16)); });
@@ -459,7 +467,7 @@ const Archive3D: React.FC<Props> = ({ files, pageCipher, collectedPages, sealedC
 
     // 10) 封存卷宗：中央的黑色方块。输入密钥后，盒子打开，三件证物升起来
     let unlockedAt = -1;
-    const vault = addStation('sealed_truth.enc', 0, 2.2, 5, g => {
+    const vault = addStation('sealed_truth.enc', 2.2, g => {
       const faces: THREE.Mesh[] = [];
       const mat = new THREE.MeshStandardMaterial({ color: 0x0a0d0b, metalness: 0.6, roughness: 0.35 });
       const S2 = 2.2;
@@ -521,7 +529,7 @@ const Archive3D: React.FC<Props> = ({ files, pageCipher, collectedPages, sealedC
     }, undefined, 3.2);
 
     // 11) world_03.plan：北边的门。门外有一片天空正在慢慢上色
-    addStation('world_03.plan', 345, 1.6, 20, g => {
+    addStation('world_03.plan', 1.6, g => {
       for (const x of [-1.6, 1.6]) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.5, 5, 0.5), new THREE.MeshStandardMaterial({ color: 0x0e1612 })); p.position.set(x, 2.5, 0); g.add(p); const pe = edges(new THREE.BoxGeometry(0.5, 5, 0.5), 0x36e07a, 0.5); pe.position.set(x, 2.5, 0); g.add(pe); }
       const field = new THREE.Mesh(new THREE.PlaneGeometry(2.7, 4.6), new THREE.MeshBasicMaterial({ color: 0xff5d6c, transparent: true, opacity: 0.12, side: THREE.DoubleSide, toneMapped: false }));
       field.position.set(0, 2.4, 0); g.add(field);
@@ -535,17 +543,16 @@ const Archive3D: React.FC<Props> = ({ files, pageCipher, collectedPages, sealedC
     }, 'world_03.plan', 5.4);
 
     // 出口：南边机房缺口里的一扇门——离开这里只有这一条路（不在界面上放按钮，免得读档时误点）
-    addStation('__exit', 180, 1.3, 19, g => {
-      const metal = new THREE.MeshStandardMaterial({ color: 0x0c1411, roughness: 0.55, metalness: 0.4 });
+    addStation('__exit', 1.3, g => {
       const glow = new THREE.MeshBasicMaterial({ color: 0x36e07a, toneMapped: false });
       const box = (w: number, h: number, d: number, x: number, y: number, m: THREE.Material) => {
         const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, 0); g.add(o); return o;
       };
-      box(0.3, 3.2, 0.3, -1.05, 1.6, metal); box(0.3, 3.2, 0.3, 1.05, 1.6, metal); box(2.4, 0.3, 0.3, 0, 3.35, metal);
-      box(0.05, 3.0, 0.32, -0.88, 1.55, glow); box(0.05, 3.0, 0.32, 0.88, 1.55, glow); box(1.8, 0.05, 0.32, 0, 3.18, glow);
+      // 门框就是入口那台碎掉的大电视（archiveZones.buildBrokenFrame）；这里只在开口里补一圈绿色的边光
+      const rim = [box(0.05, 2.3, 0.08, -1.62, 1.8, glow), box(0.05, 2.3, 0.08, 1.62, 1.8, glow), box(3.2, 0.05, 0.08, 0, 2.95, glow)];
       // 门里：一片往下流的绿色光幕
       const veil = new THREE.ShaderMaterial({
-        transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
+        transparent: true, depthWrite: false, side: THREE.FrontSide, blending: THREE.AdditiveBlending,   // 只朝里面：进场时镜头在门后面，不能被光幕糊住
         uniforms: { t: { value: 0 } },
         vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }',
         fragmentShader: `uniform float t; varying vec2 vUv;
@@ -560,24 +567,27 @@ const Archive3D: React.FC<Props> = ({ files, pageCipher, collectedPages, sealedC
             gl_FragColor = vec4(c, (base + rain * .55) * edge);
           }`,
       });
-      const plane = new THREE.Mesh(new THREE.PlaneGeometry(1.75, 3.05), veil); plane.position.set(0, 1.55, 0); g.add(plane);
-      const halo = softSprite(0x36e07a, 4.2, 0.35); halo.position.set(0, 1.6, -0.2); g.add(halo);
+      const plane = new THREE.Mesh(new THREE.PlaneGeometry(3.25, 2.4), veil); plane.position.set(0, 1.8, -0.05); g.add(plane);
+      const halo = softSprite(0x36e07a, 4.6, 0.3); halo.position.set(0, 1.8, -0.3); g.add(halo);
       const floorGlow = new THREE.Mesh(new THREE.CircleGeometry(1.4, 32), new THREE.MeshBasicMaterial({ color: 0x36e07a, transparent: true, opacity: 0.18, depthWrite: false, toneMapped: false }));
       floorGlow.rotation.x = -Math.PI / 2; floorGlow.position.y = 0.02; g.add(floorGlow);
       const motes = Array.from({ length: 12 }, (_, i) => {
         const m = softSprite(i % 3 ? 0x36e07a : 0x9cf0ff, 0.14, 0.9);
-        m.position.set((Math.random() - 0.5) * 1.6, Math.random() * 3, 0.1); g.add(m); return m;
+        m.position.set((Math.random() - 0.5) * 3.0, 0.6 + Math.random() * 2.4, 0.1); g.add(m); return m;
       });
       return (t, dt) => {
         veil.uniforms.t.value = t;
+        // 进场时镜头在门后面：门里的光晕、光点、边光只在从里面看时出现，免得把画面糊成一片绿
+        const front = camera.position.z < g.position.z - 0.3;
+        halo.visible = front; floorGlow.visible = front; rim.forEach(o => { o.visible = front; }); motes.forEach(m => { m.visible = front; });
         (halo.material as THREE.SpriteMaterial).opacity = 0.3 + Math.sin(t * 1.6) * 0.08;
-        motes.forEach((m, i) => { m.position.y += dt * (0.4 + (i % 4) * 0.15); if (m.position.y > 3.1) m.position.set((Math.random() - 0.5) * 1.6, 0, 0.1); });
+        motes.forEach((m, i) => { m.position.y += dt * (0.4 + (i % 4) * 0.15); if (m.position.y > 3.0) m.position.set((Math.random() - 0.5) * 3.0, 0.6, 0.1); });
       };
     }, '[ 离开 ]', 3.9);
 
     // 角落：一只看着裂缝的熊猫（不弹任何文字）
     const kimo = buildCheckpointPanda();
-    kimo.group.position.set(-20.4, 0, 0); kimo.group.scale.setScalar(1.4);
+    kimo.group.position.set(KIMO_POS.x, 0, KIMO_POS.z); kimo.group.scale.setScalar(1.4);
     kimo.group.lookAt(crack.position.x, 0, crack.position.z);
     world.add(kimo.group);
     const kimoLabel = label('O3-3', 'none'); kimoLabel.position.set(0, 1.9, 0); kimoLabel.visible = false; kimo.group.add(kimoLabel);
@@ -587,7 +597,7 @@ const Archive3D: React.FC<Props> = ({ files, pageCipher, collectedPages, sealedC
 
     // ---- 输入 ----
     const keys = { f: false, b: false, l: false, r: false };
-    let camYaw = 0, camPitch = 0.32, camDist = 6.5;
+    let camYaw = 0, camPitch = 0.2, camDist = 6.5;
     let near: Station | null = null;
     const kd = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement) return;
@@ -668,9 +678,11 @@ const Archive3D: React.FC<Props> = ({ files, pageCipher, collectedPages, sealedC
 
     // ---- 主循环 ----
     let raf = 0, last = performance.now();
-    const camPos = new THREE.Vector3(0, 4, 20), look = new THREE.Vector3();
+    const camPos = new THREE.Vector3(SPAWN.x, 4, SPAWN.z + 7), look = new THREE.Vector3(SPAWN.x, 1, SPAWN.z - 4);
     camera.position.copy(camPos);
     let promptCache: string | null = null;
+    // 开发用：截图时把镜头钉在固定位置（正式版不会用到）
+    const devCam: { pose: { pos: [number, number, number]; look: [number, number, number]; up?: [number, number, number] } | null; snap: boolean } = { pose: null, snap: false };
     let viewShift = 0;
     let wasReading = false;
     const loop = (now: number) => {
@@ -689,15 +701,31 @@ const Archive3D: React.FC<Props> = ({ files, pageCipher, collectedPages, sealedC
       const moving = ml > 0.01;
       if (moving) {
         mx /= ml; mz /= ml;
-        P.x += mx * 4.2 * dt; P.z += mz * 4.2 * dt;
+        // 只能走在地面上：整步走不过去就试着贴边滑
+        const nx = P.x + mx * 4.2 * dt, nz = P.z + mz * 4.2 * dt;
+        if (walkable(nx, nz)) { P.x = nx; P.z = nz; }
+        else if (walkable(nx, P.z)) P.x = nx;
+        else if (walkable(P.x, nz)) P.z = nz;
         let na = Math.atan2(mx, mz) - P.face; while (na > Math.PI) na -= Math.PI * 2; while (na < -Math.PI) na += Math.PI * 2;
         P.face += na * Math.min(1, dt * 12);
       }
-      // 碰撞：地面边缘、各个记录点
-      const rr = Math.hypot(P.x, P.z); if (rr > R - 0.8) { P.x *= (R - 0.8) / rr; P.z *= (R - 0.8) / rr; }
-      for (const s of [...stations, ...colliders.map(c => ({ pos: new THREE.Vector3(c.x, 0, c.z), radius: c.r }))]) {
-        const dx = P.x - s.pos.x, dz = P.z - s.pos.z, d = Math.hypot(dx, dz);
-        if (d < s.radius && d > 0.001) { P.x = s.pos.x + dx / d * s.radius; P.z = s.pos.z + dz / d * s.radius; }
+      // 碰撞：各个记录点、树、电视和机柜（带朝向的方盒）
+      const pushCircle = (cx: number, cz: number, rad: number) => {
+        const dx = P.x - cx, dz = P.z - cz, d = Math.hypot(dx, dz);
+        if (d < rad && d > 0.001) { P.x = cx + dx / d * rad; P.z = cz + dz / d * rad; }
+      };
+      for (const s of stations) pushCircle(s.pos.x, s.pos.z, s.radius);
+      for (const c of colliders) pushCircle(c.x, c.z, c.r);
+      for (const b of boxes) {
+        const c = Math.cos(b.yaw), sn = Math.sin(b.yaw), dx = P.x - b.x, dz = P.z - b.z;
+        const lx = dx * c - dz * sn, lz = dx * sn + dz * c;
+        const ox = b.hw + 0.3 - Math.abs(lx), oz = b.hd + 0.3 - Math.abs(lz);
+        if (ox > 0 && oz > 0) {
+          let nlx = lx, nlz = lz;
+          if (ox < oz) nlx = Math.sign(lx || 1) * (b.hw + 0.3); else nlz = Math.sign(lz || 1) * (b.hd + 0.3);
+          const npx = b.x + nlx * c + nlz * sn, npz = b.z - nlx * sn + nlz * c;
+          if (walkable(npx, npz)) { P.x = npx; P.z = npz; }
+        }
       }
       P.vy -= 14 * dt; P.y += P.vy * dt; if (P.y <= 0) { P.y = 0; P.vy = 0; P.grounded = true; }
       rig.group.position.set(P.x, P.y, P.z); rig.group.rotation.y = P.face;
@@ -762,7 +790,7 @@ const Archive3D: React.FC<Props> = ({ files, pageCipher, collectedPages, sealedC
       }
 
       // 雨
-      updCosmos(t); updFloor(t); updRoom(t); updTree(t);
+      updCosmos(t); Z.update(t, dt); Z.revealFor(P.x, P.z, dt);
       crack.scale.setScalar(1 + (unlockedAt >= 0 ? Math.min(0.4, (t - unlockedAt) * 0.05) : 0) + Math.sin(t * 1.5) * 0.02);
 
       // 镜头：平时跟着她；读记录时转去看那件东西，并把画面往左让出阅读面板的位置
@@ -781,9 +809,26 @@ const Archive3D: React.FC<Props> = ({ files, pageCipher, collectedPages, sealedC
         camPos.set(px + cx, py + 1.3 + cy, pz + cz);
         look.lerp(new THREE.Vector3(px, py + 1.1, pz), 0.2);
       }
-      { const cr = Math.hypot(camPos.x, camPos.z); if (cr > 16.6) { camPos.x *= 16.6 / cr; camPos.z *= 16.6 / cr; } }
-      camera.position.lerp(camPos, 0.08);
+      // 镜头别钻进电视堆 / 机柜里：从头顶往镜头方向走，碰到方盒就停在前一步
+      if (!readingSt) {
+        const hx = P.x, hz = P.z * wz + wpz;
+        let fx = camPos.x, fz = camPos.z;
+        for (let k = 1; k <= 10; k++) {
+          const sx = hx + (camPos.x - hx) * k / 10, sz = hz + (camPos.z - hz) * k / 10;
+          let hit = false;
+          for (const b of boxes) {
+            const c = Math.cos(b.yaw), sn = Math.sin(b.yaw), dx = sx - b.x, dz = sz - b.z;
+            if (Math.abs(dx * c - dz * sn) < b.hw + 0.15 && Math.abs(dx * sn + dz * c) < b.hd + 0.15) { hit = true; break; }
+          }
+          if (hit) { const kk = Math.max(0.35, (k - 1) / 10); fx = hx + (camPos.x - hx) * kk; fz = hz + (camPos.z - hz) * kk; break; }
+        }
+        camPos.x = fx; camPos.z = fz;
+      }
+      camPos.y = Math.max(0.5, camPos.y);
+      if (devCam.snap) { camera.position.copy(camPos); look.set(P.x, P.y + 1.1, P.z * wz + wpz); } else camera.position.lerp(camPos, 0.08);
+      camera.up.set(0, 1, 0);
       camera.lookAt(look);
+      if (devCam.pose) { if (devCam.pose.up) camera.up.set(...devCam.pose.up); camera.position.set(...devCam.pose.pos); camera.lookAt(...devCam.pose.look); }
       viewShift += ((reading && W() > 700 ? 0.2 : 0) - viewShift) * Math.min(1, dt * 6);
       if (viewShift > 0.002) camera.setViewOffset(W(), H(), W() * viewShift, 0, W(), H()); else camera.clearViewOffset();
 
@@ -795,14 +840,21 @@ const Archive3D: React.FC<Props> = ({ files, pageCipher, collectedPages, sealedC
 
     const onResize = () => { renderer.setSize(W(), H()); composer.setSize(W(), H()); labels.setSize(W(), H()); camera.aspect = W() / H(); camera.updateProjectionMatrix(); };
     window.addEventListener('resize', onResize);
-    if (import.meta.env.DEV) (window as any).__arc = { P, stations, setCam: (y: number, p: number, d: number) => { camYaw = y; camPitch = p; camDist = d; } };
+    if (import.meta.env.DEV) (window as any).__arc = { P, stations, devCam, renderer, scene, camera, boxes, colliders, walkable, world, zoneStats: Z.stats, setCam: (y: number, p: number, d: number) => { camYaw = y; camPitch = p; camDist = d; } };
 
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku);
       window.removeEventListener('pointerdown', pd); window.removeEventListener('pointermove', pm); window.removeEventListener('pointerup', pu);
       window.removeEventListener('wheel', wheel); window.removeEventListener('resize', onResize);
-      scene.traverse(o => { const m = o as THREE.Mesh; if (m.geometry) m.geometry.dispose(); });
+      // 释放所有几何、材质、贴图（反复进出不涨内存）
+      const mats = new Set<THREE.Material>();
+      scene.traverse(o => {
+        const m = o as THREE.Mesh; if (m.geometry) m.geometry.dispose();
+        const mm = (m as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+        if (Array.isArray(mm)) mm.forEach(x => mats.add(x)); else if (mm) mats.add(mm);
+      });
+      mats.forEach(m => { for (const v of Object.values(m)) if (v && (v as THREE.Texture).isTexture) (v as THREE.Texture).dispose(); m.dispose(); });
       composer.dispose(); renderer.dispose();
       renderer.domElement.remove();
       if (labelRef.current) labelRef.current.innerHTML = '';

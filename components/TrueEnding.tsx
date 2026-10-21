@@ -71,6 +71,7 @@ const VW = 640, VH = 360, FLOOR = 300;
 const DESK = { x: 384, monitorX: 424, monitorY: 187 };
 
 const Room2D: React.FC<{ onComputer: () => void; onPhoto: () => void }> = ({ onComputer, onPhoto }) => {
+  const onComputerRef = useRef(onComputer); onComputerRef.current = onComputer;
   const ref = useRef<HTMLCanvasElement>(null);
   const cg = useCgImage();
   const photos = useRoomImages();
@@ -98,7 +99,7 @@ const Room2D: React.FC<{ onComputer: () => void; onPhoto: () => void }> = ({ onC
     put('monitor', DESK.monitorX, DESK.monitorY + 54);
     put('chair', 470, FLOOR);
     put('lamp', 612, FLOOR);
-    put('bed', 10, FLOOR);
+    put('roomBed', 10, FLOOR);
     put('plant', 350, FLOOR);
 
     put('rug', 230, FLOOR + 4);
@@ -121,7 +122,7 @@ const Room2D: React.FC<{ onComputer: () => void; onPhoto: () => void }> = ({ onC
     const kd = (e: KeyboardEvent) => {
       if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.l = true;
       if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.r = true;
-      if ((e.code === 'KeyE' || e.code === 'KeyF' || e.code === 'Enter') && Math.abs(stateRef.current.x - (DESK.monitorX + 30)) < 60) onComputer();
+      if ((e.code === 'KeyE' || e.code === 'KeyF' || e.code === 'Enter') && Math.abs(stateRef.current.x - (DESK.monitorX + 30)) < 60) onComputerRef.current();
       if (keys.l || keys.r) goal.current = null;
     };
     const ku = (e: KeyboardEvent) => { if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.l = false; if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.r = false; };
@@ -155,7 +156,7 @@ const Room2D: React.FC<{ onComputer: () => void; onPhoto: () => void }> = ({ onC
     };
     raf = requestAnimationFrame(loop);
     return () => { cancelAnimationFrame(raf); window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); };
-  }, [bg, cg, photos, onComputer]);
+  }, [bg, cg, photos]);   // 回调走 ref：父组件重新渲染时不重启绘制循环，避免画面闪一下
 
   const onClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -220,12 +221,15 @@ const Room3D: React.FC<{ skin: SkinId; onComputer: () => void; onPhoto: () => vo
     // 窗（左墙）
     for (let z = 8; z <= 20; z++) for (let y = 12; y <= 22; y++) { v.del(0, y, z); gl.set(0, y, z, y > 19 && z > 16 ? 0xfff4c8 : (z * 3 + y) % 11 === 0 ? 0xffd98a : 0x1c2a5c); }
     v.box(1, 11, 7, 1, 23, 7, 0xbcd4f6); v.box(1, 11, 21, 1, 23, 21, 0xbcd4f6);
-    // 床（左下角）+ 熊猫玩偶
-    v.box(2, 0, 26, 20, 3, RD - 3, 0x8a6a4a);
-    v.box(2, 4, 26, 20, 5, RD - 3, (x, y, z) => (z < 30 ? 0xffffff : (x + z) % 5 === 0 ? 0x86b4ee : 0x9cc4f5));
-    v.box(2, 4, 26, 2, 10, RD - 3, 0xa8754f);
-    v.box(5, 6, 27, 9, 8, 29, 0xffffff);
-    v.ellipsoid(14, 8, 30, 2.2, 2, 2, 0xffffff); v.set(13, 10, 30, 0x2a2a35); v.set(15, 10, 30, 0x2a2a35); v.set(13, 8, 32, 0x2a2a35); v.set(15, 8, 32, 0x2a2a35);
+    // 床（左下角，床头靠左墙）：床架 + 床垫 + 两个枕头 + 翻折的被子 + 坐着的熊猫玩偶
+    const BZ0 = 26, BZ1 = RD - 3;
+    v.box(2, 0, BZ0, 20, 2, BZ1, (x, y) => (y === 2 ? 0x9a7652 : 0x8a6a4a));                       // 床架
+    v.box(3, 3, BZ0 + 1, 20, 4, BZ1 - 1, (x, y) => (y === 3 ? 0xe2e8f0 : 0xf6f8fc));              // 床垫 + 床单
+    v.box(2, 3, BZ0, 2, 11, BZ1, (x, y) => (y >= 10 ? 0xc48f63 : 0xa8754f));                      // 床头板
+    // 被子：盖住床尾三分之二，靠枕头这头翻出白色被里，前侧垂到床沿
+    v.box(11, 5, BZ0 + 1, 20, 5, BZ1 - 1, (x, y, z) => ((Math.floor(x / 2) + Math.floor(z / 2)) % 2 ? 0x9cc4f5 : 0x8ab8f0));
+    v.box(10, 5, BZ0 + 1, 11, 6, BZ1 - 1, (x) => (x === 10 ? 0xffffff : 0xf1f5fd));
+    v.box(11, 2, BZ1, 20, 5, BZ1, (x, y) => (y === 2 ? 0x7aa7e8 : (x % 3 === 0 ? 0x8ab8f0 : 0x9cc4f5)));
     // 书桌（后墙右边）+ 显示器 + 椅子 + 台灯
     v.box(32, 0, 2, 54, 7, 10, (x, y) => (y === 7 ? 0xb07a4c : x === 32 || x === 54 ? 0x8a5a3b : null));
     v.box(36, 8, 3, 45, 15, 4, 0x2a2f45); v.box(40, 8, 5, 41, 8, 6, 0x2a2f45);
@@ -245,6 +249,58 @@ const Room3D: React.FC<{ skin: SkinId; onComputer: () => void; onPhoto: () => vo
     const glow = new THREE.Mesh(gl.geometry(S, [0, 0, 0], 0.02), new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false }));
     const roomG = new THREE.Group(); roomG.add(room, glow); roomG.position.set(-RW * S / 2, 0, -RD * S / 2);
     scene.add(roomG);
+
+    // ---- 床上的枕头和熊猫玩偶：单独用细体素（2.5cm / 1.8cm 一格），软乎乎的，不是方砖 ----
+    const fine = (vx: Vox, F: number, x: number, y: number, z: number, ry = 0) => {
+      const m = new THREE.Mesh(vx.geometry(F, [0, 0, 0], 0, 0.5), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }));
+      m.castShadow = true; m.receiveShadow = true; m.position.set(x, y, z); m.rotation.y = ry; roomG.add(m); return m;
+    };
+    {
+      // 枕头：圆鼓鼓的超椭圆，中间最厚、四周收薄；顶面斜着压出一道浅褶
+      const pillow = () => {
+        const pv = new Vox(), NX = 22, NZ = 30, NH = 7;
+        for (let i = 0; i < NX; i++) for (let k = 0; k < NZ; k++) {
+          const u = (i + 0.5) / NX * 2 - 1, w = (k + 0.5) / NZ * 2 - 1;
+          const r = u ** 4 + w ** 4;
+          if (r > 1) continue;
+          let h = Math.max(1, Math.round(NH * Math.sqrt(1 - r)));
+          const crease = Math.abs(k - NZ / 2 - (i - NX / 2) * 0.35) < 1 && h > 3;
+          if (crease) h -= 1;
+          for (let y = 0; y < h; y++) pv.set(i, y, k, y === h - 1 ? (crease ? 0xe4eaf6 : 0xffffff) : y === 0 ? 0xdde4f0 : 0xf1f5fb);
+        }
+        return pv;
+      };
+      const PF = 0.025, top = 5 * S;
+      fine(pillow(), PF, 3 * S + 0.03, top, (BZ0 + 2) * S, -0.05);
+      fine(pillow(), PF, 3 * S + 0.05, top, (BZ0 + 10.5) * S, 0.06);
+
+      // 熊猫玩偶：坐着，脚伸在前面，脖子系蓝色丝带
+      const pv = new Vox(), PW = 0xffffff, PB = 0x24252e, PK = 0xf2a6ae;
+      const rbox = (ax: number, ay: number, az: number, bx: number, by: number, bz: number, c: number | ((x: number, y: number, z: number) => number)) => {
+        for (let x = ax; x <= bx; x++) for (let y = ay; y <= by; y++) for (let z = az; z <= bz; z++) {
+          const e = (x === ax || x === bx ? 1 : 0) + (y === ay || y === by ? 1 : 0) + (z === az || z === bz ? 1 : 0);
+          if (e < 2) pv.set(x, y, z, typeof c === 'number' ? c : c(x, y, z));
+        }
+      };
+      rbox(0, 3, 0, 9, 11, 8, (x, y, z) => (z === 8 && x >= 2 && x <= 7 && y >= 5 && y <= 9 ? 0xfdfbf5 : PW)); // 身体 + 肚皮
+      rbox(1, 0, 5, 3, 3, 11, PB); rbox(6, 0, 5, 8, 3, 11, PB);                                                // 腿
+      for (const lx of [1, 6]) for (let x = lx; x <= lx + 2; x++) for (let y = 0; y <= 2; y++) if (pv.has(x, y, 11)) pv.set(x, y, 11, y === 1 && x === lx + 1 ? 0xd98a95 : PK); // 肉垫
+      rbox(-2, 5, 2, -1, 10, 6, PB); rbox(10, 5, 2, 11, 10, 6, PB);                                            // 手
+      for (let x = 0; x <= 9; x++) for (let z = 0; z <= 8; z++) if (x === 0 || x === 9 || z === 0 || z === 8) pv.set(x, 11, z, 0x93c5fd); // 丝带
+      pv.set(4, 11, 9, 0x93c5fd); pv.set(5, 11, 9, 0x93c5fd); pv.set(3, 12, 9, 0x93c5fd); pv.set(6, 12, 9, 0x93c5fd);
+      rbox(-2, 12, -1, 11, 23, 10, PW);                                                                         // 头
+      rbox(-2, 22, 2, 1, 26, 5, PB); rbox(8, 22, 2, 11, 26, 5, PB);                                             // 耳朵
+      // 脸（头的正面 z=10）：下垂的黑眼圈 + 高光、凸出一点的鼻子、腮红
+      for (const [x0, s2] of [[0, -1], [6, 1]] as const) for (let x = x0; x <= x0 + 3; x++) for (let y = 15; y <= 18; y++) {
+        if (y === 18 && (s2 < 0 ? x === x0 : x === x0 + 3)) continue;
+        if (y === 15 && (s2 < 0 ? x === x0 + 3 : x === x0)) continue;
+        pv.set(x, y, 10, PB);
+      }
+      pv.set(2, 17, 10, 0xffffff); pv.set(7, 17, 10, 0xffffff); pv.set(1, 16, 10, 0x3a3d4c); pv.set(8, 16, 10, 0x3a3d4c);
+      pv.set(4, 14, 11, PB); pv.set(5, 14, 11, PB); pv.set(4, 13, 10, 0x8a8c99); pv.set(5, 13, 10, 0x8a8c99);
+      pv.set(-1, 14, 10, PK); pv.set(10, 14, 10, PK);
+      fine(pv, 0.018, 13 * S, 6 * S, (BZ1 - 7) * S, -0.35);
+    }
     const toWorld = (x: number, y: number, z: number) => new THREE.Vector3(x * S - RW * S / 2, y * S, z * S - RD * S / 2);
 
     // 显示器屏幕（画着桌面）
@@ -385,6 +441,7 @@ const Room3D: React.FC<{ skin: SkinId; onComputer: () => void; onPhoto: () => vo
       camera.position.lerp(camPos, 0.08);
       look.lerp(new THREE.Vector3(P.x * 0.6, 1.0, P.z * 0.5 - 0.3), 0.08);
       camera.lookAt(look);
+      if (import.meta.env.DEV && (window as any).__roomCam) { const c = (window as any).__roomCam; camera.position.set(c[0], c[1], c[2]); camera.lookAt(c[3], c[4], c[5]); }
       renderer.render(scene, camera);
       raf = requestAnimationFrame(loop);
     };

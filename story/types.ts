@@ -41,6 +41,8 @@ export interface Choice {
 
 export interface SceneNode {
   lines: Line[];
+  /** 这一段对话背景里要真正画出来的东西（不是台词）。clock7：墙上指着七点整的钟 */
+  prop?: 'clock7';
   choices?: Choice[];
   next?: string | null;
 }
