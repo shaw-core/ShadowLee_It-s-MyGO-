@@ -11,7 +11,7 @@ https://shaw-core.github.io/ShadowLee_It-s-MyGO-/
 
 建议使用桌面端 Chrome、Edge 或其他现代浏览器，并开启声音以获得完整体验。
 
-当前版本：**v0.16.1**
+当前版本：**v0.16.2**
 
 ---
 
@@ -319,3 +319,8 @@ Made with React, TypeScript and Three.js.
 - 隐藏档案馆按四个分区重建：入口电视迷宫 → VHS 网格通道（带回环小路）→ 故障档案机房 → 世界树核心。离开的门是入口那台碎掉的大电视。
 - 第一章三个选项、第 2 话结尾（客厅里多了一个七点整的钟）、Kimo熊「把小李送回来」的说法按编剧稿更正。
 - 验收记录：`docs/RETURNWORK_BASELINE.md`、`docs/RETURNWORK_QA.md`、`docs/qa/`。
+
+### v0.16.2（第二章过场《快醒醒！》）
+
+- 第二章第五关跳进裂缝之后、原有终章和终端之前，新增一段独立的全屏过场：白色梦境、蓝色像素外星人和企鹅、两句蓝色像素大字，以及一段画外的呼唤。看过以后可以在手账「回忆」里重看。
+- 说明与测试：`docs/WAKEUP_CUTSCENE_IMPLEMENTATION.md`。

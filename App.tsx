@@ -31,6 +31,7 @@ import SpecialCG3D from './components/SpecialCG3D';
 import MatrixEnding from './components/MatrixEnding';
 import Walkman from './components/Walkman';
 import AudioNotice from './components/AudioNotice';
+import UauaWakeupCutscene from './components/UauaWakeupCutscene';
 
 type Ch = 1 | 2;
 type Screen =
@@ -44,6 +45,7 @@ type Screen =
   | { k: 'cg3d' }
   | { k: 'secret' }
   | { k: 'specialcg' }
+  | { k: 'wakeup'; replay?: boolean }   // 第二章过场《快醒醒！》
   | { k: 'blank' };
 
 type Story = { kind: 'dlg'; id: string; overlay: boolean } | { kind: 'page'; id: string } | null;
@@ -119,6 +121,7 @@ const App: React.FC = () => {
       case 'play': id = `c${playCh}_${playIdx + 1}`; break;
       case 'cg3d': case 'secret': case 'specialcg': id = 'ending'; break;
       case 'matrix': id = null; break;
+      case 'wakeup': id = null; break;   // 过场自己管声音；场景配乐淡出
       default: id = undefined;
     }
     if (id !== undefined) score.scene(id);
@@ -150,12 +153,6 @@ const App: React.FC = () => {
     setScreen(prev => ({ k: 'play', ch, idx, run: (prev.k === 'play' ? prev.run : 0) + 1 }));
   }, []);
 
-  // 开发 / 验收：直接跳到某一关或回菜单（正式版不存在）
-  useEffect(() => {
-    if (!import.meta.env.DEV) return;
-    (window as any).__app = { play: (ch: Ch, idx: number) => { setStory(null); play(ch, idx); }, menu: () => { setStory(null); setScreen({ k: 'menu' }); }, screen: () => screenRef.current };
-  }, [play]);
-  const screenRef = useRef(screen); screenRef.current = screen;
 
   const startChapter = useCallback((ch: Ch, idx = 0) => {
     sfx('confirm');
@@ -211,6 +208,7 @@ const App: React.FC = () => {
     setScreen({ k: 'result', ch, idx, res, newBest, story: story && !always });
   }, []);
 
+  const wakeupDone = useRef(false);
   const finishChapter = useCallback((ch: Ch) => {
     if (ch === 1) {
       playStory({ kind: 'page', id: 'c1_close' }, () => {
@@ -219,11 +217,23 @@ const App: React.FC = () => {
         setScreen({ k: 'specialcg' });
       });
     } else {
-      playStory({ kind: 'dlg', id: 'c2_end', overlay: false }, () => {
-        updateSave(d => { d.cleared2 = true; });
-        setScreen({ k: 'matrix' });
-      });
+      // 第五关跳进裂缝之后：先放独立过场《快醒醒！》，结束后再接原有 c2_end → 终端结局
+      wakeupDone.current = false;
+      setScreen({ k: 'wakeup' });
     }
+  }, [playStory]);
+
+  // 过场结束（只会接一次）：原有的第二章收束——c2_end → 写通关 → 终端
+  const onWakeupEnd = useCallback((replay?: boolean) => {
+    if (wakeupDone.current) return;
+    wakeupDone.current = true;
+    markSeen('cut:c2_wakeup');
+    if (replay) { setScreen({ k: 'codex' }); return; }
+    setScreen({ k: 'blank' });
+    playStory({ kind: 'dlg', id: 'c2_end', overlay: false }, () => {
+      updateSave(d => { d.cleared2 = true; });
+      setScreen({ k: 'matrix' });
+    });
   }, [playStory]);
 
   const advance = useCallback((ch: Ch, idx: number) => {
@@ -238,6 +248,14 @@ const App: React.FC = () => {
     }
     else { setScreen({ k: 'blank' }); finishChapter(ch); }
   }, [play, finishChapter, playStory]);
+
+  // 开发 / 验收：直接跳到某一关或回菜单（正式版不存在）
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    (window as any).__app = { play: (ch: Ch, idx: number) => { setStory(null); play(ch, idx); }, menu: () => { setStory(null); setScreen({ k: 'menu' }); }, screen: () => screenRef.current,
+      finish2: () => finishChapter(2), advanceLast2: () => advance(2, LEVELS3D.length - 1) };
+  }, [play, finishChapter, advance]);
+  const screenRef = useRef(screen); screenRef.current = screen;
 
   const onResultContinue = useCallback(() => {
     if (screen.k !== 'result') return;
@@ -329,7 +347,8 @@ const App: React.FC = () => {
         <Codex onBack={() => setScreen({ k: 'menu' })}
           onReplayScene={id => playStory({ kind: 'dlg', id, overlay: false }, () => setScreen({ k: 'codex' }))}
           onReplayPage={id => playStory({ kind: 'page', id }, () => setScreen({ k: 'codex' }))}
-          onArchive={() => setScreen({ k: 'matrix', direct: true })} />
+          onArchive={() => setScreen({ k: 'matrix', direct: true })}
+          onReplayWakeup={() => { wakeupDone.current = false; setScreen({ k: 'wakeup', replay: true }); }} />
       )}
 
       {screen.k === 'matrix' && (
@@ -344,12 +363,16 @@ const App: React.FC = () => {
           }} />
       )}
 
+      {screen.k === 'wakeup' && (
+        <UauaWakeupCutscene key={screen.replay ? 'replay' : 'first'} allowSkip={screen.replay || hasSeen('cut:c2_wakeup')}
+          onEnd={() => onWakeupEnd(screen.replay)} />
+      )}
       {screen.k === 'cg3d' && <SpecialCG3D skin={skinNow} onExit={() => setScreen({ k: 'menu' })} />}
       {screen.k === 'secret' && <TrueEnding cleared2={save.cleared2} skin={skinNow} onExit={() => setScreen({ k: 'menu' })} />}
       {screen.k === 'specialcg' && <SpecialCGView onExit={() => setScreen({ k: 'menu' })} />}
 
       {storyNode}
-      <Walkman hidden={screen.k === 'matrix' || anomalyVisible} />
+      <Walkman hidden={screen.k === 'matrix' || screen.k === 'wakeup' || anomalyVisible} />
       <AudioNotice />
     </div>
   );

@@ -19,6 +19,8 @@ interface Props {
   onReplayPage: (id: string) => void;
   /** 重新接入 3D 档案馆（只有电视头小豆进去） */
   onArchive?: () => void;
+  /** 第二章过场《快醒醒！》（看过以后才出现） */
+  onReplayWakeup?: () => void;
 }
 
 const UNLOCK_HINT = (u: string) => {
@@ -33,7 +35,7 @@ const UNLOCK_HINT = (u: string) => {
 
 const PAGE_TITLES: Record<string, string> = { c1_open: '开场 · 某个晚上', c1_close: '第一章 · 终页', c2_open: '第二章 · 第零页', c2_mid1: '第二章 · 薄荷糖', c2_mid2: '第二章 · 那条街', c2_mid3: '第二章 · 彩色的手', c2_mid4: '第二章 · 天上的缝', arc_open: '附录 · 另一条线' };
 
-const Codex: React.FC<Props> = ({ onBack, onReplayScene, onReplayPage, onArchive }) => {
+const Codex: React.FC<Props> = ({ onBack, onReplayScene, onReplayPage, onArchive, onReplayWakeup }) => {
   const save = useSave();
   const hacked = hasFlag('hack');
   const [tab, setTab] = useState<Tab>('people');
@@ -115,6 +117,9 @@ const Codex: React.FC<Props> = ({ onBack, onReplayScene, onReplayPage, onArchive
                         className="btn px-3 py-2 text-sm">{open ? <><Play size={14} />{PAGE_TITLES[id] ?? id}</> : <><Lock size={14} />？？？</>}</button>
                     );
                   })}
+                  {onReplayWakeup && save.seenScenes.includes('cut:c2_wakeup') && (
+                    <button onClick={() => { sfx('confirm'); onReplayWakeup(); }} className="btn px-3 py-2 text-sm"><Play size={14} />快醒醒！</button>
+                  )}
                 </div>
               </div>
               {memScenes.map(g => (

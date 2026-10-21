@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## v0.16.2 · 第二章独立过场《快醒醒！》
+- 新增 `components/UauaWakeupCutscene.tsx`、`components/UauaPixelSprites.tsx`；`App.tsx` 的 `finishChapter(2)` 先进过场，再接原有 `c2_end` → 终端；手账回放入口
+- 对白按编剧最终执行文稿逐字实现；只有一小段低通、低音量的歌曲片段；不解锁随身听曲目；不改 `MatrixEnding.tsx`
+- 详见 `docs/WAKEUP_CUTSCENE_IMPLEMENTATION.md`
+
 ## v0.16.1 · uaua 专属曲与在场事件 / 隐藏档案馆重建 / 文案更正（分支 fix/dialogue-art-ending-polish）
 
 ### P0-A 悠亚
