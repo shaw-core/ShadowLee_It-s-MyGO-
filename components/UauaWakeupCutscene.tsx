@@ -1,7 +1,8 @@
 // ============================================================
 // 第二章 · 独立过场《快醒醒！》
 //  第五关跳进裂缝之后、原有 c2_end 与终端结局之前播放。
-//  白色朦胧的梦境、蓝色像素外星人与企鹅、蓝色像素大字，画外的呼唤与两个人的对话。
+//  白色朦胧的梦境、点阵电子屏上的外星人与企鹅、终端风格的蓝色大字，画外的呼唤与两个人的对话。
+//  v0.16.4：半梦半醒——眼皮沉沉半合、画面失焦随呼吸起伏，每喊一声就猛地对一下焦、波纹荡开，一次比一次清楚。
 //  · 所有对白、两句大字按编剧最终执行文稿逐字实现，不加台词；「？？？」是画外音，不露脸、不出名字牌
 //  · 没有配音：只有字幕 + 很轻的一小段滤波后的歌（第二句大字附近，约 3.5 秒）+ 图案脉动
 //  · 时间轴驱动（镜头 A–G），自动连播；点击 / 空格 / 回车可以提前进入下一句字幕
@@ -10,10 +11,11 @@
 //  · 不碰 uaua 在场事件、不解锁随身听曲目（那是第三章的事）
 // ============================================================
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PixelSprite, PENGUIN_A, PENGUIN_B, ALIEN, PAIR } from './UauaPixelSprites';
+import { PixelSprite, LedSprite, PENGUIN_A, PENGUIN_B, ALIEN, PAIR } from './UauaPixelSprites';
 import { UAUA_TRACK } from '../music';
 import { getSave } from '../core/save';
 import { walkman } from '../core/audio';
+import { WakeupSound } from './wakeupAudio';
 
 type Who = '？？？' | '李豆沙' | '室友姐';
 interface Line { who: Who; t: string; at: number; dur: number }
@@ -59,31 +61,21 @@ const SNIP_AT = 15.2, SNIP_LEN = 3.6, SNIP_FROM = 62;
 
 const smooth = (a: number, b: number, t: number) => { const k = Math.max(0, Math.min(1, (t - a) / (b - a))); return k * k * (3 - 2 * k); };
 
-// ---------------- 像素大字：画到小画布上再放大，保持方格 ----------------
-const PixelText: React.FC<{ text: string; px: number; style?: React.CSSProperties }> = ({ text, px, style }) => {
-  const ref = useRef<HTMLCanvasElement>(null);
-  const [ar, setAr] = useState(4);
-  useEffect(() => {
-    const draw = () => {
-      const c = ref.current; if (!c) return;
-      const x = c.getContext('2d')!;
-      const font = `900 ${px}px "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif`;
-      x.font = font;
-      const w = Math.ceil(x.measureText(text).width) + 4, h = Math.ceil(px * 1.25);
-      c.width = w; c.height = h;
-      x.font = font; x.textBaseline = 'middle'; x.fillStyle = '#246bc9';
-      x.fillText(text, 2, h / 2 + 1);
-      // 二值化：去掉抗锯齿的半透明边，像素边缘干干净净
-      const d = x.getImageData(0, 0, w, h);
-      for (let i = 3; i < d.data.length; i += 4) d.data[i] = d.data[i] > 90 ? 255 : 0;
-      x.putImageData(d, 0, 0);
-      setAr(w / h);
-    };
-    draw();
-    document.fonts?.ready.then(draw).catch(() => {});
-  }, [text, px]);
-  return <canvas ref={ref} aria-label={text} style={{ imageRendering: 'pixelated', aspectRatio: String(ar), ...style }} />;
-};
+// ---------------- 终端风格的大字：等宽字体、逐字打出、方块光标、蓝色辉光（和后面的终端同一种字） ----------------
+const TERM_FONT = '"JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, "Noto Sans SC", monospace';
+const TermText: React.FC<{ text: string; shown: number; size: string; opacity: number; cursor: boolean }> = ({ text, shown, size, opacity, cursor }) => (
+  <div aria-label={text} className="whitespace-nowrap" style={{
+    fontFamily: TERM_FONT, fontSize: size, lineHeight: 1.1, opacity, letterSpacing: '0.06em', fontWeight: 500,
+    // 字身带扫描线（像终端屏幕上的字），外面一圈蓝色辉光
+    color: 'transparent', backgroundImage: 'repeating-linear-gradient(0deg, #1652ad 0 2px, #2f74d6 2px 3px)', WebkitBackgroundClip: 'text', backgroundClip: 'text',
+    textShadow: '-1px 0 0 rgba(80,170,255,.35), 0 0 10px rgba(36,107,201,.35), 0 0 24px rgba(36,107,201,.18)',
+  }}>
+    {text.slice(0, shown)}
+    <span style={{ visibility: shown < text.length || cursor ? 'visible' : 'hidden', opacity: 0.85 }}>{shown < text.length || cursor ? '█' : ''}</span>
+    {/* 占位：没打出来的字也占着宽度，整行不跳 */}
+    <span style={{ visibility: 'hidden' }}>{text.slice(shown)}</span>
+  </div>
+);
 
 interface Props { onEnd: () => void; allowSkip?: boolean }
 
@@ -93,6 +85,9 @@ const UauaWakeupCutscene: React.FC<Props> = ({ onEnd, allowSkip }) => {
   const ended = useRef(false);
   const snipRef = useRef<(() => void) | null>(null);
   const snipDone = useRef(false);
+  const soundRef = useRef<WakeupSound | null>(null);
+  const calledRef = useRef(-1);
+  const lastMix = useRef(-1);
   const [confirmSkip, setConfirmSkip] = useState(false);
   const reduce = useMemo(() => getSave().settings.reduceMotion || (typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches), []);
 
@@ -106,9 +101,27 @@ const UauaWakeupCutscene: React.FC<Props> = ({ onEnd, allowSkip }) => {
   useEffect(() => {
     let raf = 0, last = performance.now();
     const loop = (now: number) => {
-      const dt = Math.min(0.1, (now - last) / 1000); last = now;
+      const dt = Math.min(0.25, (now - last) / 1000); last = now;   // 帧率低的设备上也按真实时间走，和声音对得上
       if (!document.hidden) { tRef.current += dt; setT(tRef.current); }
       if (!snipDone.current && tRef.current >= SNIP_AT && snipRef.current) { snipDone.current = true; snipRef.current(); }
+      // 背景声：梦境底跟着画面起伏；「？？？」开口时远处响起电子呼唤
+      const snd = soundRef.current, tt = tRef.current;
+      if (snd) {
+        if (tt >= 2.8) snd.startDream();
+        const li = WAKEUP_LINES.findIndex(l => tt >= l.at && tt < l.at + l.dur);
+        if (li >= 0 && li > calledRef.current) {
+          calledRef.current = li;
+          if (WAKEUP_LINES[li].who === '？？？') snd.call(WAKEUP_LINES[li].t);
+        }
+        if (tt - lastMix.current > 0.25) {
+          lastMix.current = tt;
+          const speaking = li >= 0 && WAKEUP_LINES[li].who === '？？？';
+          const snip = tt > SNIP_AT && tt < SNIP_AT + SNIP_LEN + 0.5;
+          const k = smooth(2.8, 7.5, tt) * (1 + 0.3 * smooth(43.8, 46.6, tt) * (1 - smooth(47, 49, tt)) + 0.25 * smooth(58.4, 60.8, tt))
+            * (speaking ? 0.7 : 1) * (snip ? 0.6 : 1) * (1 - smooth(FADE_OUT_AT, TOTAL, tt));
+          snd.setDream(k);
+        }
+      }
       if (tRef.current >= TOTAL) { finish(); return; }
       raf = requestAnimationFrame(loop);
     };
@@ -127,7 +140,12 @@ const UauaWakeupCutscene: React.FC<Props> = ({ onEnd, allowSkip }) => {
     const c = ctx;
     if (c.state === 'suspended') c.resume().catch(() => {});
     const out = c.createGain(); out.gain.value = 1; out.connect(c.destination);
-    // 镜头 A：一声往下沉的低频 + 一层很薄的气声
+    const snd = new WakeupSound(c, out, vol);
+    soundRef.current = snd;
+    (window as any).__wakeupSound = snd;
+    const onVis = () => snd.pause(document.hidden);
+    document.addEventListener('visibilitychange', onVis);
+    // 镜头 A：一声往下沉的低频（之后接上 wakeupAudio.ts 的梦境底和电子呼唤） + 一层很薄的气声
     {
       const now = c.currentTime;
       const o = c.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(120, now); o.frequency.exponentialRampToValueAtTime(42, now + 3.6);
@@ -167,6 +185,8 @@ const UauaWakeupCutscene: React.FC<Props> = ({ onEnd, allowSkip }) => {
     };
     return () => {
       snipRef.current = null;
+      document.removeEventListener('visibilitychange', onVis);
+      snd.dispose(); soundRef.current = null;
       timers.forEach(clearTimeout);
       if (el) { el.pause(); el.removeAttribute('src'); el.load(); }
       c.close().catch(() => {});
@@ -216,6 +236,24 @@ const UauaWakeupCutscene: React.FC<Props> = ({ onEnd, allowSkip }) => {
   const blueGlow = smooth(58.4, 60.8, t) * 0.55;
   const endFade = smooth(FADE_OUT_AT, TOTAL, t);
 
+  // ---- 半梦半醒（v0.16.4）----
+  // 喊声：第几声了、这一声开口多久了。一次比一次清楚——画面也跟着一次比一次「对上焦」
+  const calls = WAKEUP_LINES.filter(l => l.who === '？？？' && t >= l.at);
+  const lastCall = calls[calls.length - 1];
+  const callK = lastCall ? t - lastCall.at : 99;                       // 距离最近一声多久
+  const clarity = Math.min(1, Math.max(0, calls.length - 1) / 4);       // 0 → 1
+  const focus = callK < 3 ? Math.exp(-callK * 0.9) : 0;                // 刚喊的那一下，猛地对焦
+  const wake = smooth(58.6, 61.5, t);                                   // 镜头 G：醒过来
+  const dreamBlur = Math.max(0, (2.4 - 1.5 * clarity) * (1 - wake) * smooth(3.5, 6, t) - focus * 2.4);
+  const spriteBlur = Math.max(0, (0.7 - 0.6 * clarity) * (1 - wake) - focus);
+  // 眼皮：沉沉地半合着，偶尔慢慢合上又睁开；被喊的时候一惊、睁开一点；醒来时完全睁开
+  const droop = (c: number) => { const k = (t - c) / 1.6; return k > 0 && k < 1 ? Math.sin(k * Math.PI) : 0; };
+  const lid = reduce ? 0.12 * (1 - wake) * smooth(4, 7, t)
+    : Math.max(0, Math.min(0.92, (smooth(4, 6, t) * (0.38 - 0.18 * smooth(6, 10, t)) + 0.32 * (droop(25.4) + droop(30.6) + droop(41.8) + droop(55.6)) - focus * 0.14) * (1 - wake)));
+  const breathe = reduce ? 1 : 1 + 0.012 * Math.sin(t * 0.55);
+  const split = !reduce && callK < 0.45 ? (0.45 - callK) / 0.45 : 0;    // 刚开口时一下色偏（像信号）
+  const ripples = lastCall && callK < 3.4 ? [0, 0.45, 0.9].map(d => (callK - d) / 2.3).filter(k => k > 0 && k < 1) : [];
+
   const particles = useMemo(() => Array.from({ length: 26 }, (_, i) => ({ x: (i * 37.3) % 100, y: (i * 61.7) % 100, s: 4 + (i % 4) * 3, d: 9 + (i % 5) * 3, o: 0.06 + (i % 3) * 0.04 })), []);
   const burst = useMemo(() => Array.from({ length: 14 }, (_, i) => ({ a: (i / 14) * Math.PI * 2, r: 0.6 + (i % 3) * 0.25 })), []);
   const burstK = t > 34.4 && t < 37.7 ? (t - 34.4) / 3.3 : -1;
@@ -226,8 +264,11 @@ const UauaWakeupCutscene: React.FC<Props> = ({ onEnd, allowSkip }) => {
       <style>{`
         @keyframes wk-drift { from { transform: translateY(0) } to { transform: translateY(-40px) } }
         @keyframes wk-scan { from { background-position: 0 0 } to { background-position: 0 6px } }
+        @keyframes wk-roll { from { transform: translateY(-30%) } to { transform: translateY(130%) } }
       `}</style>
 
+      {/* —— 梦境层：失焦、随呼吸轻轻起伏（大字和字幕不在这一层，始终清楚） —— */}
+      <div className="absolute inset-0" style={{ filter: dreamBlur > 0.05 ? `blur(${dreamBlur.toFixed(2)}px)` : undefined, transform: `scale(${breathe})` }}>
       {/* 雾：四周淡蓝，中间冷白 */}
       <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at 50% 42%, rgba(250,253,255,1) 0%, rgba(240,247,255,${0.9}) 38%, rgba(196,222,250,${fog}) 78%, rgba(160,200,245,${fog + 0.1}) 100%)` }} />
       {/* 下坠时远去的几何：几道蓝线收拢、淡出 */}
@@ -249,8 +290,19 @@ const UauaWakeupCutscene: React.FC<Props> = ({ onEnd, allowSkip }) => {
             animation: reduce ? undefined : `wk-drift ${p.d}s linear ${-i}s infinite alternate` }} />
         ))}
       </div>
-      {/* 扫描纹 */}
+      </div>
+      {/* 扫描纹 + 一道慢慢往下滚的干扰亮带（和电视头小豆结尾的屏幕同一种质感） */}
       <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(0deg, rgba(36,107,201,.045) 0 1px, transparent 1px 3px)', animation: reduce ? undefined : 'wk-scan 1.2s linear infinite' }} />
+      {!reduce && <div className="absolute inset-x-0 h-1/4 pointer-events-none" style={{ background: 'linear-gradient(transparent, rgba(110,160,240,.07), transparent)', animation: 'wk-roll 7s linear infinite' }} />}
+
+      {/* 喊声的波纹：从企鹅那里一圈圈荡开，一次比一次大、一次比一次清楚 */}
+      {ripples.map((k, i) => (
+        <div key={i} className="absolute left-1/2 pointer-events-none rounded-full" style={{
+          top: `${pTop}%`, width: `${(14 + k * (26 + clarity * 30))}vmin`, aspectRatio: '1', transform: 'translate(-50%, -50%)',
+          border: `${3 - i}px solid rgba(52,124,222,${(1 - k) * (0.28 + clarity * 0.4)})`,
+          boxShadow: `0 0 18px rgba(120,180,255,${(1 - k) * 0.35})`,
+        }} />
+      ))}
 
       {/* 像素图案 */}
       <div className="absolute left-1/2 pointer-events-none" style={{ top: `${pTop}%`, transform: `translate(-50%, -50%) scale(${pScale})`, width: 'clamp(120px, 24vmin, 230px)' }}>
@@ -258,17 +310,18 @@ const UauaWakeupCutscene: React.FC<Props> = ({ onEnd, allowSkip }) => {
           {/* 淡蓝光晕（在精灵后面，不糊轮廓） */}
           <div className="absolute -inset-[30%] rounded-full" style={{ background: 'radial-gradient(circle, rgba(120,180,255,.35) 0%, rgba(120,180,255,0) 65%)', opacity: Math.max(alienA, penguinA) + sigPulse * 0.6 }} />
           {alienA > 0.01 && (
-            <PixelSprite grid={ALIEN} title="像素外星人" className="absolute inset-0 w-full h-full"
+            <LedSprite grid={ALIEN} title="电子外星人图标" className="absolute inset-0 w-full h-full"
               style={{ opacity: alienA * (glitch ? 0.55 : 1), transform: glitch ? 'translateX(-6%)' : undefined }} />
           )}
           {glitch && (
-            <PixelSprite grid={PENGUIN_A} title="" className="absolute inset-0 w-full h-full" style={{ opacity: 0.6, transform: 'translateX(7%)', clipPath: 'inset(20% 0 35% 0)' }} />
+            <LedSprite grid={PENGUIN_A} panel={false} title="" className="absolute inset-0 w-full h-full" style={{ opacity: 0.6, transform: 'translateX(7%)', clipPath: 'inset(20% 0 35% 0)' }} />
           )}
           {penguinA > 0.01 && (
             <>
-              {ghost && <PixelSprite grid={PENGUIN_A} title="" className="absolute inset-0 w-full h-full" style={{ opacity: 0.35, transform: 'translate(5%, -2%)' }} />}
-              <PixelSprite grid={frameB ? PENGUIN_B : PENGUIN_A} title="像素企鹅" className="absolute inset-0 w-full h-full"
-                style={{ opacity: penguinA * (1 - dissolve * 0.75), filter: `drop-shadow(0 0 6px rgba(120,180,255,.55))`,
+              {ghost && <LedSprite grid={PENGUIN_A} panel={false} title="" className="absolute inset-0 w-full h-full" style={{ opacity: 0.35, transform: 'translate(5%, -2%)' }} />}
+              <LedSprite grid={frameB ? PENGUIN_B : PENGUIN_A} title="电子企鹅图标" className="absolute inset-0 w-full h-full"
+                style={{ opacity: penguinA * (1 - dissolve * 0.75),
+                  filter: `${spriteBlur > 0.05 ? `blur(${spriteBlur.toFixed(2)}px) ` : ''}drop-shadow(0 0 6px rgba(120,180,255,.55))${split > 0 ? ` drop-shadow(${(3 * split).toFixed(1)}px 0 0 rgba(255,110,140,${(0.55 * split).toFixed(2)})) drop-shadow(${(-3 * split).toFixed(1)}px 0 0 rgba(60,140,255,${(0.6 * split).toFixed(2)}))` : ''}`,
                   clipPath: dissolve > 0.02 ? `inset(${dissolve * 22}% 0 0 0)` : undefined }} />
             </>
           )}
@@ -281,33 +334,45 @@ const UauaWakeupCutscene: React.FC<Props> = ({ onEnd, allowSkip }) => {
       {/* 蓝色像素大字 */}
       {(big1 > 0.01 || big2 > 0.01) && (
         <div className="absolute inset-x-0 flex flex-col items-center gap-[2vh] pointer-events-none" style={{ top: '44%' }}>
-          <PixelText text="快醒醒！" px={22} style={{ height: 'clamp(52px, 13vmin, 140px)', opacity: big1, transform: `scale(${1 + 0.08 * (1 - smooth(BIG1_AT, BIG1_AT + 0.25, t))})`,
-            filter: 'drop-shadow(2px 1px 0 rgba(120,180,255,.75)) drop-shadow(0 0 10px rgba(80,150,240,.35))', maxWidth: '92vw' }} />
-          <PixelText text="快醒醒，豆沙！" px={22} style={{ height: 'clamp(60px, 15vmin, 170px)', opacity: big2, transform: `scale(${1 + 0.08 * (1 - smooth(BIG2_AT, BIG2_AT + 0.25, t))})`,
-            filter: 'drop-shadow(2px 1px 0 rgba(120,180,255,.75)) drop-shadow(0 0 12px rgba(80,150,240,.4))', maxWidth: '94vw' }} />
+          <TermText text="快醒醒！" size="clamp(40px, 10vmin, 112px)" opacity={big1}
+            shown={Math.min(4, Math.floor((t - BIG1_AT) * 16) + 1)} cursor={false} />
+          <TermText text="快醒醒，豆沙！" size="clamp(40px, 10.5vmin, 120px)" opacity={big2}
+            shown={Math.min(7, Math.floor((t - BIG2_AT) * 16) + 1)} cursor={!reduce && Math.floor(t * 1.8) % 2 === 0} />
         </div>
       )}
 
       {/* 白雾里的两个人（低对比剪影） */}
       {pair > 0.01 && (
         <div className="absolute left-1/2 pointer-events-none" style={{ top: '58%', transform: 'translate(-50%, -50%)', width: 'clamp(130px, 22vmin, 220px)', opacity: pair * 0.9 }}>
-          <PixelSprite grid={PAIR} colors={{ O: '#c3d5ec' }} title="豆沙和室友姐的剪影" className="w-full h-auto" style={{ filter: 'blur(0.4px)' }} />
+          <PixelSprite grid={PAIR} colors={{ O: '#c3d5ec' }} title="豆沙和室友姐的剪影" className="w-full h-auto" style={{ filter: `blur(${(0.4 + dreamBlur * 0.5).toFixed(2)}px)` }} />
         </div>
       )}
 
       {/* 字幕 */}
       {line && (
         <div className="absolute inset-x-0 bottom-[7%] flex justify-center px-4 pointer-events-none">
-          <div className="max-w-[min(680px,92vw)] w-full px-5 py-3 rounded-lg" style={{ opacity: lineK, background: 'rgba(255,255,255,.78)', border: '2px solid rgba(36,107,201,.45)', boxShadow: '0 4px 24px rgba(36,107,201,.12)' }}>
-            <div className="text-xs font-bold tracking-wider mb-1" style={{ color: line.who === '？？？' ? '#6a8fc4' : line.who === '李豆沙' ? '#246bc9' : '#c2702e' }}>
+          <div className="max-w-[min(680px,92vw)] w-full px-5 py-3 rounded-md relative overflow-hidden" style={{
+            opacity: lineK, fontFamily: TERM_FONT, background: 'rgba(8,22,52,.82)', border: '1px solid rgba(90,160,255,.55)',
+            boxShadow: '0 0 0 1px rgba(36,107,201,.25), 0 6px 30px rgba(36,107,201,.25), inset 0 0 30px rgba(60,130,240,.12)' }}>
+            <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(0deg, rgba(0,0,0,.22) 0 1px, transparent 1px 3px)' }} />
+            <div className="relative text-xs font-bold tracking-wider mb-1" style={{ color: line.who === '？？？' ? 'rgba(160,200,255,.7)' : line.who === '李豆沙' ? '#8fd0ff' : '#ffc896' }}>
               {line.who}
             </div>
-            <div className="text-lg md:text-xl font-bold" style={{ color: '#1c3f78', fontStyle: line.who === '？？？' ? 'italic' : undefined, letterSpacing: '0.02em' }}>
-              「{line.t.slice(0, shown)}{shown >= line.t.length ? '」' : ''}
+            <div className="relative text-base md:text-xl font-bold" style={{ color: '#d8ecff', textShadow: '0 0 8px rgba(110,180,255,.55)', fontStyle: line.who === '？？？' ? 'italic' : undefined, letterSpacing: '0.02em' }}>
+              「{line.t.slice(0, shown)}{shown >= line.t.length ? '」' : <span style={{ opacity: 0.85 }}>█</span>}
             </div>
           </div>
         </div>
       )}
+
+      {/* 眼皮：视野变成一道椭圆的缝，上下边缘是柔软的暗蓝——眼睛沉沉地半合着 */}
+      {lid > 0.005 && (
+        <div className="absolute inset-0 pointer-events-none" style={{
+          background: `radial-gradient(ellipse 125% ${Math.max(6, (1 - lid) * 100).toFixed(1)}% at 50% 47%, rgba(30,45,85,0) 62%, rgba(36,56,102,${(0.42 + lid * 0.45).toFixed(2)}) 80%, rgba(22,34,66,${(0.62 + lid * 0.38).toFixed(2)}) 100%)`,
+        }} />
+      )}
+      {/* 屏幕玻璃的暗角：圆角、四周微微发暗，像隔着一块老电视的玻璃在看梦 */}
+      <div className="absolute inset-0 pointer-events-none" style={{ borderRadius: 'clamp(12px, 3vw, 34px)', boxShadow: `inset 0 0 ${120 + 60 * (1 - clarity)}px rgba(70,105,170,${0.28 * (1 - wake * 0.6)})` }} />
 
       {/* 镜头 G：蓝光过渡；结尾淡出 */}
       <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse at 50% 40%, rgba(150,195,255,.9), rgba(90,150,235,.6))', opacity: blueGlow * (1 - endFade) }} />

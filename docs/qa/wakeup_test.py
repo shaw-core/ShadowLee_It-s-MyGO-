@@ -33,6 +33,7 @@ async def run(p, w, h, tag, full=True):
             if ("「" + l + "」") in st["text"] and (not seen or seen[-1] != l): seen.append(l)
         if st["snip"] and st["snip"].get("gain") is not None and (snip is None or st["snip"]["gain"] > snip.get("peak", 0)):
             snip = dict(st["snip"]); snip["peak"] = st["snip"]["gain"]; snip["at"] = round(el, 1)
+        if st["screen"] == "wakeup" and "fps" not in shots and el > 30: shots["fps"] = await pg.evaluate("() => new Promise(r => { let n = 0; const t0 = performance.now(); const f = () => { n++; if (performance.now() - t0 < 1000) requestAnimationFrame(f); else r(n); }; requestAnimationFrame(f); })")
         if k < len(timeline) and el >= timeline[k][0]:
             await snap(timeline[k][1])
             if timeline[k][1] == "penguin": shots["scene"] = await pg.evaluate("() => window.__uaua.debug().score")
@@ -46,7 +47,7 @@ async def main():
     async with async_playwright() as p:
         b, pg, errs, seen, snip, dur, shots = await run(p, 1280, 720, "")
         check("scene BGM stopped during the cutscene (score scene = null, no uaua presence)", shots.get("scene", {}).get("scene", 1) is None, json.dumps(shots.get("scene")))
-        check("cutscene shows instead of the terminal, lasts 55–80 s", 55 <= dur <= 80, f"{dur:.1f} s")
+        check("cutscene shows instead of the terminal, lasts 55–80 s", 55 <= dur <= 80, f"{dur:.1f} s (headless software rendering ≈ {shots.get('fps')} fps)")
         check("all 21 locked lines appear in order", seen == LINES, f"{len(seen)} lines: {seen[:3]}…{seen[-2:]}")
         lvl = 0.9 * 0.45 * 0.22
         check("song snippet: low-pass ~650 Hz, peak gain ≈ 22% of BGM, stopped afterwards", snip and abs(snip["peak"] - lvl) < 0.01 and snip["lp"] == 650 and shots.get("snipAfter", {}).get("paused") is True, json.dumps(snip) + " after: " + json.dumps(shots.get("snipAfter")))
@@ -62,6 +63,8 @@ async def main():
         check("c2_end → cleared2 written → Matrix terminal", scr == "matrix" and sv["cleared2"] is True, f"screen={scr} cleared2={sv['cleared2']}")
         check("walkman track NOT unlocked in chapter 2", "music:uaua_kanashibari" not in sv["flags"], str(sv["flags"]))
         check("seen flag for replay written", "cut:c2_wakeup" in sv["seenScenes"])
+        calls = await pg.evaluate("() => window.__wakeupSound ? window.__wakeupSound.calls : -1")
+        check("background sound: dream bed + electronic call fired for each of the 5 「？？？」 lines", calls == 5, f"calls={calls}")
         check("no page errors", not errs, json.dumps(errs[:3]))
         await b.close()
         # 窄屏（手机竖屏）只看前三镜
